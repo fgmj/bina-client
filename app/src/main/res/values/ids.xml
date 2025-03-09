@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <item name="buttonDiscover" type="id"/>
+    <item name="buttonTest" type="id"/>
+    <item name="editTextUrl" type="id"/>
+</resources>
