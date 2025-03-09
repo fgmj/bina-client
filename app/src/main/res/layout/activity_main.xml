@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+              android:layout_width="match_parent"
+              android:layout_height="match_parent"
+              android:orientation="vertical"
+              android:padding="16dp">
+
+    <!-- RecyclerView que ocupa a maior parte da tela -->
+    <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/recycler_view"
+            android:layout_width="match_parent"
+            android:layout_height="0dp"
+            android:layout_weight="1"
+            android:padding="8dp"
+            android:background="@android:color/darker_gray"
+            android:clipToPadding="false"/>
+
+    <!-- Campo de entrada de IP -->
+    <EditText
+            android:id="@+id/editTextIp"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Digite o IP"
+            android:inputType="text"
+            android:minHeight="48dp"
+            android:padding="12dp"
+            android:background="@android:color/white"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp"/>
+
+    <!-- Campo de entrada de IP -->
+    <EditText
+            android:id="@+id/editTextUrl"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:hint="Digite a URL"
+            android:inputType="text"
+            android:minHeight="48dp"
+            android:padding="12dp"
+            android:background="@android:color/white"
+            android:layout_marginBottom="16dp"
+            android:elevation="2dp"/>
+
+    <!-- Botão de salvar -->
+
+    <Button
+            android:id="@+id/buttonDiscover"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Procurar servidor"
+            android:padding="12dp"
+            android:elevation="2dp"
+            android:textColor="@android:color/white"
+            android:backgroundTint="@android:color/holo_blue_light"/>
+
+    <Button
+            android:id="@+id/buttonTest"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Testar conexáo"
+            android:padding="12dp"
+            android:elevation="2dp"
+            android:textColor="@android:color/white"
+            android:backgroundTint="@android:color/holo_blue_light"/>
+
+</LinearLayout>
