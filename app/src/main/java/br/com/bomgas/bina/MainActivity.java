@@ -2,12 +2,14 @@ package br.com.bomgas.bina;
 
 import android.Manifest;
 import android.content.*;
+import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 
 import android.util.Log;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.TextView;
 import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
@@ -19,8 +21,6 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-import javax.jmdns.JmDNS;
-import javax.jmdns.ServiceInfo;
 import java.io.IOException;
 import java.lang.reflect.Type;
 import java.net.InetAddress;
@@ -31,10 +31,10 @@ public class MainActivity extends AppCompatActivity {
     private static final int REQUEST_CODE_PERMISSIONS = 123;
     private static final String PREFS_NAME = "LogPrefs";
     private static final String LOG_KEY = "LogList";
-    private static final String IP_KEY = "ServerIp";
+
     private static final String TAG = "MainActivity";
-    private EditText editTextIp;
-    private Button buttonDiscover, buttonTest;
+
+    private Button buttonTest;
     private final List<String> logList = new ArrayList<>();
     private RecyclerView recyclerView;
     private LogAdapter logAdapter;
@@ -47,43 +47,45 @@ public class MainActivity extends AppCompatActivity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        try {
-            editTextIp = findViewById(R.id.editTextIp);
-            buttonDiscover = findViewById(R.id.buttonDiscover);
-            buttonTest = findViewById(R.id.buttonTest);
-            editTextUrl = findViewById(R.id.editTextUrl);
+        TextView textVersion = findViewById(R.id.textVersion);
 
+        try {
+
+            buttonTest = findViewById(R.id.buttonTest);
             recyclerView = findViewById(R.id.recycler_view);
             recyclerView.setLayoutManager(new LinearLayoutManager(this));
 
-
             loadLogs(); // Carregar logs ao iniciar a aplicação
             loadConfigs();
-
-            editTextUrl.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) {
-                    saveUrl(editTextUrl.getText().toString());
-                }
-            });
-
-            editTextIp.setOnFocusChangeListener((v, hasFocus) -> {
-                if (!hasFocus) {
-                    saveIp(editTextIp.getText().toString());
-                }
-            });
 
             logAdapter = new LogAdapter(logList);
             recyclerView.setAdapter(logAdapter);
             addLogEntry("Iniciando aplicação...");
 
-            buttonDiscover.setOnClickListener(v -> discoverServer());
-            buttonTest.setOnClickListener(v -> testConnection());
-            checkPermissions();
+            buttonTest.setOnClickListener(v -> testConnection(getApplicationContext()));
             recyclerView.scrollToPosition(logList.size() - 1);
+
+            checkPermissions();
 
         } catch (Exception e) {
             Log.e(TAG, "Erro ao iniciar a aplicação: " + e.getMessage(), e);
             addLogEntry("Erro ao iniciar: " + e.getMessage());
+        }
+
+        try {
+            PackageInfo pInfo = getPackageManager().getPackageInfo(getPackageName(), 0);
+            String versionName = pInfo.versionName;
+            long lastUpdateTime = pInfo.lastUpdateTime;
+
+            // Formata a data para exibição (exemplo: 11/03/2025)
+            String buildDate = new SimpleDateFormat("dd/MM/yyyy", Locale.getDefault()).format(new Date(lastUpdateTime));
+
+            // Define o texto na tela
+            textVersion.setText("Versão " + versionName + " - " + buildDate);
+
+        } catch (Exception e) {
+            Log.e(TAG, "Falha ao recuperar versão: " + e.getMessage(), e);
+            addLogEntry("Falha ao recuperar versão: " + e.getMessage());
         }
     }
 
@@ -134,55 +136,19 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    private void discoverServer() {
-        addLogEntry("Procurando servidor...");
+    private void testConnection(Context context) {
         new Thread(() -> {
             try {
+                // Enviar um evento de teste para a API
+                CallReceiver.sendEventToAPI(context, "TEST_CONNECTION", "Teste de conexão com a API", "N/A", "N/A");
 
-                InetAddress addr = InetAddress.getLocalHost();
-                String hostname = InetAddress.getByName(addr.getHostName()).toString();
-
-
-                JmDNS jmdns = JmDNS.create(addr, hostname);
-                ServiceInfo[] services = jmdns.list("_http._tcp.local.");
-                addLogEntry("Serviços encontrados: "+ Arrays.asList(services));
-
-                if (services.length > 0) {
-                    String serverIp = services[0].getInetAddresses()[0].getHostAddress();
-                    int serverPort = services[0].getPort();
-                    runOnUiThread(() -> {
-                        editTextIp.setText(serverIp + ":" + serverPort);
-                        saveIp(serverIp + ":" + serverPort);
-                        addLogEntry("Servidor encontrado: " + serverIp + ":" + serverPort);
-                    });
-                } else {
-                    runOnUiThread(() -> addLogEntry("Nenhum servidor encontrado."));
-                }
-
-                jmdns.close();
-            } catch (IOException e) {
-                Log.e(TAG, "Erro ao descobrir servidor: " + e.getMessage(), e);
-                runOnUiThread(() -> addLogEntry("Erro ao descobrir servidor."));
-            }
-        }).start();
-    }
-
-    private void testConnection() {
-        String ip = editTextIp.getText().toString();
-        if (ip.isEmpty()) {
-            Toast.makeText(this, "Nenhum IP configurado!", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        new Thread(() -> {
-            try {
-                InetAddress address = InetAddress.getByName(ip.split(":")[0]);
+                InetAddress address = InetAddress.getByName(CallReceiver.API_IP);
                 boolean reachable = address.isReachable(3000);
                 runOnUiThread(() -> {
                     if (reachable) {
-                        addLogEntry("Servidor acessível em " + ip);
+                        addLogEntry("Servidor acessível em " + CallReceiver.API_IP);
                     } else {
-                        addLogEntry("Falha ao conectar no servidor " + ip);
+                        addLogEntry("Falha ao conectar no servidor " + CallReceiver.API_IP);
                     }
                 });
             } catch (IOException e) {
@@ -191,15 +157,9 @@ public class MainActivity extends AppCompatActivity {
             }
         }).start();
     }
-
     @Override
     protected void onStart() {
         super.onStart();
-        try {
-            LocalBroadcastManager.getInstance(this).registerReceiver(logReceiver, new IntentFilter("br.com.bomgas.bina.NEW_LOG"));
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao registrar logReceiver: " + e.getMessage(), e);
-        }
     }
 
     @Override
@@ -253,25 +213,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
-
-
-
     private void loadConfigs() {
         try {
             SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-
-            String savedIp = sharedPreferences.getString(IP_KEY, null);
-            if (savedIp != null) {
-                editTextIp.setText(savedIp);
-                ConfigSingleton.getInstance().setIP(savedIp);
-            }
-
-            String savedUrl = sharedPreferences.getString(URL_KEY, "http://%SAVED_IP%/number/%PHONE_NUMBER%");
-            if (savedUrl != null){
-                editTextUrl.setText(savedUrl);
-                ConfigSingleton.getInstance().setUrl(savedUrl);
-            }
+            //String savedIp = sharedPreferences.getString(IP_KEY, null);
 
         } catch (Exception e) {
             Log.e(TAG, "Erro ao carregar configurações: " + e.getMessage(), e);
@@ -279,38 +224,5 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void saveIp(String ip) {
-        try {
-            addLogEntry("IP salvo: " + ip);
-            SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-            SharedPreferences.Editor editor = sharedPreferences.edit();
-            editor.putString(IP_KEY, ip);
-            editor.apply();
 
-            // Atualizar o IP no CallReceiver
-            Intent intent = new Intent("br.com.bomgas.bina.NEW_IP");
-            intent.putExtra("message", ip);
-            LocalBroadcastManager.getInstance(MainActivity.this).sendBroadcast(intent);
-
-            ConfigSingleton.getInstance().setIP(ip);
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao salvar IP: " + e.getMessage(), e);
-            addLogEntry("Erro ao salvar IP: " + e.getMessage());
-        }
-    }
-
-    private void saveUrl(String url) {
-        SharedPreferences sharedPreferences = getSharedPreferences(PREFS_NAME, MODE_PRIVATE);
-        SharedPreferences.Editor editor = sharedPreferences.edit();
-        editor.putString(URL_KEY, url);
-        editor.apply();
-
-        Intent intent = new Intent("br.com.bomgas.bina.NEW_URL");
-        intent.putExtra("message", url);
-        LocalBroadcastManager.getInstance(MainActivity.this).sendBroadcast(intent);
-
-        ConfigSingleton.getInstance().setUrl(url);
-
-        addLogEntry("URL salva: " + url);
-    }
 }
