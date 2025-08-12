@@ -2,5 +2,4 @@
 <resources>
     <item name="buttonDiscover" type="id"/>
     <item name="buttonTest" type="id"/>
-    <item name="editTextUrl" type="id"/>
 </resources>
