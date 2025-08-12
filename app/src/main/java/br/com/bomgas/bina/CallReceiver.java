@@ -147,7 +147,7 @@ public class CallReceiver extends BroadcastReceiver {
                 @Override
                 public void onResponse(@NotNull Call call, @NotNull Response response)  {
                     String responseMessage;
-                    try {
+                    try (response) {
                         if (response.isSuccessful()) {
                             responseMessage = "Mensagem local enviada com sucesso para: " + phoneNumber;
                             Log.i(TAG, responseMessage);
@@ -156,8 +156,6 @@ public class CallReceiver extends BroadcastReceiver {
                             Log.w(TAG, responseMessage);
                         }
                         saveLog(context, responseMessage);
-                    } finally {
-                        response.close();
                     }
                 }
             });
@@ -209,7 +207,7 @@ public class CallReceiver extends BroadcastReceiver {
                 @Override
                 public void onResponse(@NotNull Call call, @NotNull Response response)  {
                     String responseMessage;
-                    try {
+                    try (response) {
                         if (response.isSuccessful()) {
                             responseMessage = "Evento enviado com sucesso: " + eventType;
                             Log.i(TAG, responseMessage);
@@ -218,8 +216,6 @@ public class CallReceiver extends BroadcastReceiver {
                             Log.w(TAG, responseMessage);
                         }
                         saveLog(context, responseMessage);
-                    } finally {
-                        response.close();
                     }
                 }
             });
