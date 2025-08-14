@@ -226,7 +226,6 @@ public class CallReceiver extends BroadcastReceiver {
         }
     }
 
-    // Método para obter nível da bateria
     private static int getBatteryLevel(Context context) {
         try {
             BatteryManager batteryManager = (BatteryManager) context.getSystemService(Context.BATTERY_SERVICE);
@@ -239,7 +238,6 @@ public class CallReceiver extends BroadcastReceiver {
         return -1; // Valor indicando erro
     }
 
-    // Método para obter localização
     private static JSONObject getLocation(Context context) {
         JSONObject locationJson = new JSONObject();
         try {
