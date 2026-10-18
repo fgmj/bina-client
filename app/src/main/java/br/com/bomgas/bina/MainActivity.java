@@ -43,6 +43,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+
         setContentView(R.layout.activity_main);
 
         try {
@@ -50,8 +51,8 @@ public class MainActivity extends AppCompatActivity {
             setupRecyclerView();
             loadLogs();
             setupEventListeners();
-            checkPermissions();
             setupBroadcastReceiver();
+            checkPermissions();
 
             addLogEntry("Aplicação iniciada com sucesso");
             scrollToLastLog();
@@ -143,12 +144,18 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
+            if (android.os.Build.VERSION.SDK_INT >= 33
+                    && ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS)
+                    != PackageManager.PERMISSION_GRANTED) {
+                missingPermissions.add(Manifest.permission.POST_NOTIFICATIONS);
+            }
             if (!missingPermissions.isEmpty()) {
                 ActivityCompat.requestPermissions(this,
                         missingPermissions.toArray(new String[0]), REQUEST_CODE_PERMISSIONS);
                 addLogEntry("Solicitando permissões necessárias...");
             } else {
                 addLogEntry("Todas as permissões já concedidas");
+                startMonitoring();
             }
         } catch (Exception e) {
             Log.e(TAG, "Erro ao verificar permissões: " + e.getMessage(), e);
@@ -156,7 +163,13 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-
+    private void startMonitoring() {
+        if (CallMonitorService.start(this)) {
+            addLogEntry("Inicialização do monitoramento solicitada");
+        } else {
+            addLogEntry("Monitoramento indisponível: verifique as permissões de telefone e reabra o aplicativo");
+        }
+    }
     public void addLogEntry(String message) {
         try {
             if (message == null || message.trim().isEmpty()) {
@@ -225,7 +238,7 @@ public class MainActivity extends AppCompatActivity {
 
                 // Enviar um evento de teste para a API
                 CallReceiver.sendEventToAPI(context, "TEST_CONNECTION",
-                        "Teste de conexão com a API", "N/A", "N/A");
+                        "Teste de conexão com a API", "N/A", "N/A", 0);
 
                 // Teste de conectividade
                 InetAddress address = InetAddress.getByName(CallReceiver.API_IP);
@@ -269,7 +282,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     @Override
-    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions, @NonNull int[] grantResults) {
+    public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
+            @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
         try {
             if (requestCode == REQUEST_CODE_PERMISSIONS) {
@@ -285,6 +299,7 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
+                startMonitoring();
                 if (allGranted) {
                     addLogEntry("Todas as permissões concedidas");
                     Toast.makeText(this, "Permissões concedidas com sucesso!", Toast.LENGTH_SHORT).show();

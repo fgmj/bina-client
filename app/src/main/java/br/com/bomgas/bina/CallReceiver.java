@@ -5,18 +5,20 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.pm.PackageManager;
+import android.location.Location;
 import android.location.LocationManager;
+import android.os.BatteryManager;
+import android.os.SystemClock;
+import android.provider.Settings;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
 import android.util.Log;
-import android.provider.Settings;
-import android.os.BatteryManager;
-import android.location.Location;
 
 import androidx.core.app.ActivityCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
+import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
 import java.io.IOException;
@@ -32,81 +34,112 @@ import okhttp3.OkHttpClient;
 import okhttp3.Request;
 import okhttp3.RequestBody;
 import okhttp3.Response;
-import org.jetbrains.annotations.NotNull;
 
 public class CallReceiver extends BroadcastReceiver {
-
     private static final String TAG = "CallReceiver";
-    private static final int MAX_PHONE_NUMBER_LENGTH = 15;
-    public static final String API_URL = "https://bina.fernandojunior.com.br/api/eventos";
+    public static final String API_URL = BuildConfig.BINA_API_URL;
     public static final String API_IP = "204.216.163.47";
     private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
     private static final OkHttpClient client = new OkHttpClient();
 
+    private static final IncomingCallTracker callTracker = new IncomingCallTracker();
+
     @Override
     public void onReceive(Context context, Intent intent) {
-        if (TelephonyManager.ACTION_PHONE_STATE_CHANGED.equals(intent.getAction())) {
-            String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
-            String incomingNumber = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
-
-            // Obtendo o número do telefone que está recebendo a chamada
-            String receivingNumber = "";
-            int slotIndex = -1;
-
-            try {
-                // Verifica permissão antes de acessar informações do telefone
-                if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE) != PackageManager.PERMISSION_GRANTED) {
-                    Log.w(TAG, "Permissão READ_PHONE_STATE não concedida");
-                    saveLog(context, "Permissão READ_PHONE_STATE não concedida");
-                    return;
-                }
-
-                SubscriptionManager sm = (SubscriptionManager) context.getSystemService(Context.TELEPHONY_SUBSCRIPTION_SERVICE);
-                if (sm == null) {
-                    Log.w(TAG, "SubscriptionManager não disponível");
-                    saveLog(context, "SubscriptionManager não disponível");
-                    return;
-                }
-
-                // Primeiro tenta obter o slot da chamada
-                int subId = intent.getIntExtra("subscription", -1);
-                if (subId != -1) {
-                    SubscriptionInfo info = sm.getActiveSubscriptionInfo(subId);
-                    if (info != null) {
-                        slotIndex = info.getSimSlotIndex();
-                        receivingNumber = info.getNumber();
-                        Log.d(TAG, "Chamada recebida no SIM: " + (slotIndex + 1));
-                    }
-                } else {
-                    // Fallback: tenta obter informações do primeiro SIM ativo
-                    List<SubscriptionInfo> subscriptions = sm.getActiveSubscriptionInfoList();
-                    if (subscriptions != null && !subscriptions.isEmpty()) {
-                        SubscriptionInfo info = subscriptions.get(0);
-                        slotIndex = info.getSimSlotIndex();
-                        receivingNumber = info.getNumber();
-                    }
-                }
-
-            } catch (Exception e) {
-                String exceptionMessage = "Erro ao buscar número destinatário: " + e.getMessage();
-                saveLog(context, exceptionMessage);
-                Log.e(TAG, exceptionMessage, e);
-            }
-
-            if (TelephonyManager.EXTRA_STATE_RINGING.equals(state)) {
-                if (incomingNumber != null && !incomingNumber.isEmpty()
-                        && incomingNumber.matches("\\d+")
-                        && incomingNumber.length() <= MAX_PHONE_NUMBER_LENGTH) {
-
-                    Log.i(TAG, "Chamada recebida [SIM " + (slotIndex + 1) + "] de: " + incomingNumber + " para: " + (receivingNumber != null ? receivingNumber : "Número desconhecido"));
-
-                    sendEventToAPI(context, "CALL_RECEIVED", "Chamada recebida", incomingNumber, receivingNumber);
-                    sendWebhookLocal(context, incomingNumber);
-                } else {
-                    Log.w(TAG, "Número de chamada recebido é nulo ou inválido.");
-                }
-            }
+        if (intent == null || !TelephonyManager.ACTION_PHONE_STATE_CHANGED.equals(intent.getAction())
+                || !CallMonitorService.hasPhonePermissions(context)) {
+            return;
         }
+        try {
+            String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+            int subscriptionId = intent.getIntExtra("subscription", -1);
+            IncomingCallTracker.Event event;
+            if (TelephonyManager.EXTRA_STATE_RINGING.equals(state)) {
+                // Android sends a second copy without this extra when both phone permissions exist.
+                if (!intent.hasExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)) {
+                    return;
+                }
+                String number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+                number = number == null ? "" : number.replaceAll("[^0-9+]", "");
+                if (!number.isEmpty() && !number.matches("\\+?[0-9]{1,15}")) {
+                    return;
+                }
+                event = callTracker.ringing(subscriptionId, number, getReceivingNumber(context, intent));
+            } else if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(state)) {
+                event = callTracker.answered(subscriptionId, SystemClock.elapsedRealtime());
+            } else if (TelephonyManager.EXTRA_STATE_IDLE.equals(state)) {
+                event = callTracker.ended(subscriptionId, SystemClock.elapsedRealtime());
+            } else {
+                return;
+            }
+            if (event == null) {
+                return;
+            }
+            String description;
+            switch (event.type) {
+                case "CALL_RECEIVED":
+                    description = "Chamada recebida";
+                    break;
+                case "CALL_ANSWERED_INCOMING":
+                    description = "Chamada recebida atendida";
+                    break;
+                case "CALL_MISSED":
+                    description = "Chamada não atendida";
+                    break;
+                default:
+                    description = "Chamada encerrada - Duração: " + formatDurationStatic(event.durationSeconds);
+                    break;
+            }
+            saveLog(context, description + (event.phoneNumber.isEmpty() ? " - Número oculto" : ": " + event.phoneNumber));
+            sendEventToAPI(context, event.type, description, event.phoneNumber,
+                    event.receivingNumber, event.durationSeconds);
+            if ("CALL_RECEIVED".equals(event.type) && !event.phoneNumber.isEmpty()) {
+                sendWebhookLocal(context, event.phoneNumber);
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro no CallReceiver", e);
+            saveLog(context, "Erro no monitoramento: " + e.getMessage());
+        }
+    }
+    private String getReceivingNumber(Context context, Intent intent) {
+        try {
+            if (ActivityCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE)
+                    == PackageManager.PERMISSION_GRANTED) {
+                SubscriptionManager manager = (SubscriptionManager) context.getSystemService(
+                        Context.TELEPHONY_SUBSCRIPTION_SERVICE);
+                if (manager != null) {
+                    int subscriptionId = intent.getIntExtra("subscription", -1);
+                    SubscriptionInfo info = subscriptionId != -1
+                            ? manager.getActiveSubscriptionInfo(subscriptionId) : null;
+                    if (info == null && subscriptionId == -1) {
+                        List<SubscriptionInfo> subscriptions = manager.getActiveSubscriptionInfoList();
+                        if (subscriptions != null && !subscriptions.isEmpty()) {
+                            info = subscriptions.get(0);
+                        }
+                    }
+                    if (info != null && info.getNumber() != null && !info.getNumber().isEmpty()) {
+                        return info.getNumber();
+                    }
+                }
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao buscar número destinatário", e);
+        }
+        return getMyPhoneNumber(context);
+    }
+    private String getMyPhoneNumber(Context context) {
+        try {
+            TelephonyManager telephonyManager = (TelephonyManager) context.getSystemService(Context.TELEPHONY_SERVICE);
+            if (telephonyManager != null &&
+                    ActivityCompat.checkSelfPermission(context,
+                            Manifest.permission.READ_PHONE_STATE) == PackageManager.PERMISSION_GRANTED) {
+                String number = telephonyManager.getLine1Number();
+                return number != null ? number : "Número desconhecido";
+            }
+        } catch (Exception e) {
+            Log.e(TAG, "Erro ao obter número do telefone: " + e.getMessage(), e);
+        }
+        return "Número desconhecido";
     }
 
     private void sendWebhookLocal(Context context, String phoneNumber) {
@@ -125,21 +158,19 @@ public class CallReceiver extends BroadcastReceiver {
                 return;
             }
 
-            // Constrói a URL utilizando o IP salvo
             url = montaURL(phoneNumber, savedIP, url);
             Log.i(TAG, "Enviando webhook para: " + url);
             saveLog(context, "Enviando webhook para: " + url);
 
-            // Criação do request
             Request request = new Request.Builder()
                     .url(url)
                     .build();
 
-            // Execução do request de forma assíncrona
             client.newCall(request).enqueue(new Callback() {
                 @Override
-                public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                    String errorMessage = "Falha ao enviar mensagem local para: " + phoneNumber + ". Erro: " + e.getMessage();
+                public void onFailure(Call call, IOException e) {
+                    String errorMessage = "Falha ao enviar mensagem local para: " + phoneNumber + ". Erro: "
+                            + e.getMessage();
                     saveLog(context, errorMessage);
                     Log.e(TAG, errorMessage, e);
                 }
@@ -166,7 +197,8 @@ public class CallReceiver extends BroadcastReceiver {
         }
     }
 
-    public static void sendEventToAPI(Context context, String eventType, String description, String phoneNumber, String receivingNumber) {
+    public static void sendEventToAPI(Context context, String eventType, String description, String phoneNumber,
+            String receivingNumber, long duration) {
         try {
             String deviceId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
             String timestamp = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
@@ -175,13 +207,10 @@ public class CallReceiver extends BroadcastReceiver {
             additionalData.put("numero", phoneNumber);
             additionalData.put("data", timestamp);
             additionalData.put("receivingNumber", receivingNumber);
-
-            // Adicionar nível da bateria
             additionalData.put("batteryLevel", getBatteryLevel(context));
-
-            // Adicionar localização
-            JSONObject location = getLocation(context);
-            additionalData.put("location", location);
+            additionalData.put("location", getLocation(context));
+            additionalData.put("duration", duration);
+            additionalData.put("durationFormatted", formatDurationStatic(duration));
 
             JSONObject json = new JSONObject();
             json.put("description", description);
@@ -294,10 +323,18 @@ public class CallReceiver extends BroadcastReceiver {
         return locationJson;
     }
 
+    private static String formatDurationStatic(long seconds) {
+        long hours = seconds / 3600;
+        long minutes = (seconds % 3600) / 60;
+        long secs = seconds % 60;
 
+        if (hours > 0) {
+            return String.format(Locale.getDefault(), "%02d:%02d:%02d", hours, minutes, secs);
+        } else {
+            return String.format(Locale.getDefault(), "%02d:%02d", minutes, secs);
+        }
+    }
 
-
-    @NotNull
     protected static String montaURL(String phoneNumber, String savedIP, String url) {
         return url.replace("%SAVED_IP%", savedIP).replace("%PHONE_NUMBER%", phoneNumber);
     }
