@@ -1,5 +1,9 @@
 # Monitoramento Android de chamadas recebidas
 
+> Documento do comportamento-base de `a777111`. O fluxo de configuração, o teste
+> de conexão e o envio paralelo à ponte descritos abaixo foram substituídos pelo
+> [fluxo do issue #3](docs/issue-3-validation.md). O ciclo telefônico permanece.
+
 Esta alteração registra o ciclo observado de chamadas recebidas e mantém um serviço em primeiro plano com notificação. Não conclui as tarefas de evolução publicadas no GitHub.
 
 ## Eventos

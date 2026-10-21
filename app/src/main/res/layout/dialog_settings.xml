@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android" android:layout_width="match_parent" android:layout_height="wrap_content" android:fillViewport="true">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:padding="20dp">
+        <RadioGroup android:id="@+id/environmentChoice" android:layout_width="match_parent" android:layout_height="wrap_content">
+            <RadioButton android:id="@+id/chooseProduction" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Produção — configuração pronta" />
+            <RadioButton android:id="@+id/chooseLocal" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Servidor local" />
+        </RadioGroup>
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Endereço local (sem porta ou caminho)" android:labelFor="@id/localAddress" />
+        <EditText android:id="@+id/localAddress" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textUri" android:singleLine="true" android:hint="192.168.1.10 ou https://servidor" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Porta local" android:labelFor="@id/localPort" />
+        <EditText android:id="@+id/localPort" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:singleLine="true" android:maxLength="5" />
+        <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Nome do aparelho neste servidor" android:labelFor="@id/deviceName" />
+        <EditText android:id="@+id/deviceName" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapSentences" android:singleLine="true" android:maxLength="255" android:hint="Ex.: Recepção" />
+        <TextView android:id="@+id/settingsFeedback" android:layout_width="match_parent" android:layout_height="wrap_content" android:accessibilityLiveRegion="polite" android:text="Testar não altera o ambiente ativo. Salvar ativa o ambiente e cadastra o nome." />
+    </LinearLayout>
+</ScrollView>

@@ -16,17 +16,8 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
-    buildFeatures {
-        buildConfig true
-    }
-
     buildTypes {
-        debug {
-            def localApiUrl = project.findProperty('binaApiUrl') ?: 'https://bina.fernandojunior.com.br/api/eventos'
-            buildConfigField 'String', 'BINA_API_URL', groovy.json.JsonOutput.toJson(localApiUrl.toString())
-        }
         release {
-            buildConfigField 'String', 'BINA_API_URL', '"https://bina.fernandojunior.com.br/api/eventos"'
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }

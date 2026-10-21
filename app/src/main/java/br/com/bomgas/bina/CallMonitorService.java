@@ -20,6 +20,9 @@ import androidx.core.content.ContextCompat;
 public class CallMonitorService extends Service {
     private static final String TAG = "CallMonitorService";
     private static final String CHANNEL_ID = "call_monitor";
+    private static volatile boolean running;
+
+    static boolean isRunning(Context context) { return running && hasPhonePermissions(context); }
 
     static boolean hasPhonePermissions(Context context) {
         return ContextCompat.checkSelfPermission(context, Manifest.permission.READ_PHONE_STATE)
@@ -45,6 +48,7 @@ public class CallMonitorService extends Service {
     public void onCreate() {
         super.onCreate();
         startForeground(1, createNotification());
+        running = true;
     }
 
     @Override
@@ -79,5 +83,11 @@ public class CallMonitorService extends Service {
     @Override
     public IBinder onBind(Intent intent) {
         return null;
+    }
+
+    @Override
+    public void onDestroy() {
+        running = false;
+        super.onDestroy();
     }
 }

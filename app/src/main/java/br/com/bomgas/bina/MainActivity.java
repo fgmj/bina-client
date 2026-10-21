@@ -6,8 +6,6 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
-import android.widget.Button;
-import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -22,9 +20,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
-import java.io.IOException;
 import java.lang.reflect.Type;
-import java.net.InetAddress;
 import java.text.SimpleDateFormat;
 import java.util.*;
 
@@ -34,7 +30,7 @@ public class MainActivity extends AppCompatActivity {
     private static final String LOG_KEY = "LogList";
     private static final String TAG = "MainActivity";
 
-    private Button buttonTest;
+    private SettingsController settingsController;
     private final List<String> logList = new ArrayList<>();
     private RecyclerView recyclerView;
     private LogAdapter logAdapter;
@@ -50,7 +46,7 @@ public class MainActivity extends AppCompatActivity {
             initializeViews();
             setupRecyclerView();
             loadLogs();
-            setupEventListeners();
+            settingsController = new SettingsController(this, this::addLogEntry);
             setupBroadcastReceiver();
             checkPermissions();
 
@@ -66,7 +62,6 @@ public class MainActivity extends AppCompatActivity {
     private void initializeViews() {
         try {
             textVersion = findViewById(R.id.textVersion);
-            buttonTest = findViewById(R.id.buttonTest);
             recyclerView = findViewById(R.id.recycler_view);
 
             setupVersionInfo();
@@ -85,17 +80,6 @@ public class MainActivity extends AppCompatActivity {
         } catch (Exception e) {
             Log.e(TAG, "Erro ao configurar RecyclerView: " + e.getMessage(), e);
             addLogEntry("Erro ao configurar lista de logs: " + e.getMessage());
-        }
-    }
-
-    private void setupEventListeners() {
-        try {
-            if (buttonTest != null) {
-                buttonTest.setOnClickListener(v -> testConnection(getApplicationContext()));
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao configurar listeners: " + e.getMessage(), e);
-            addLogEntry("Erro ao configurar botões: " + e.getMessage());
         }
     }
 
@@ -231,43 +215,17 @@ public class MainActivity extends AppCompatActivity {
         }
     };
 
-    private void testConnection(Context context) {
-        new Thread(() -> {
-            try {
-                runOnUiThread(() -> addLogEntry("Iniciando teste de conexão..."));
-
-                // Enviar um evento de teste para a API
-                CallReceiver.sendEventToAPI(context, "TEST_CONNECTION",
-                        "Teste de conexão com a API", "N/A", "N/A", 0);
-
-                // Teste de conectividade
-                InetAddress address = InetAddress.getByName(CallReceiver.API_IP);
-                boolean reachable = address.isReachable(5000); // Aumentado timeout
-
-                runOnUiThread(() -> {
-                    if (reachable) {
-                        addLogEntry("Servidor acessível em " + CallReceiver.API_IP);
-                        Toast.makeText(MainActivity.this, "Conexão bem-sucedida!", Toast.LENGTH_SHORT).show();
-                    } else {
-                        addLogEntry("Falha ao conectar no servidor " + CallReceiver.API_IP);
-                        Toast.makeText(MainActivity.this, "Falha na conexão", Toast.LENGTH_SHORT).show();
-                    }
-                });
-
-            } catch (IOException e) {
-                Log.e(TAG, "Erro ao testar conexão: " + e.getMessage(), e);
-                runOnUiThread(() -> {
-                    addLogEntry("Erro ao testar conexão: " + e.getMessage());
-                    Toast.makeText(MainActivity.this, "Erro na conexão", Toast.LENGTH_SHORT).show();
-                });
-            }
-        }).start();
-    }
-
     @Override
     protected void onStart() {
         super.onStart();
+        if (settingsController != null) settingsController.start();
         addLogEntry("Activity iniciada");
+    }
+
+    @Override
+    protected void onStop() {
+        if (settingsController != null) settingsController.stop();
+        super.onStop();
     }
 
     @Override

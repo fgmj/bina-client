@@ -9,7 +9,6 @@ import android.location.Location;
 import android.location.LocationManager;
 import android.os.BatteryManager;
 import android.os.SystemClock;
-import android.provider.Settings;
 import android.telephony.SubscriptionInfo;
 import android.telephony.SubscriptionManager;
 import android.telephony.TelephonyManager;
@@ -29,18 +28,11 @@ import java.util.Locale;
 
 import okhttp3.Call;
 import okhttp3.Callback;
-import okhttp3.MediaType;
-import okhttp3.OkHttpClient;
-import okhttp3.Request;
-import okhttp3.RequestBody;
 import okhttp3.Response;
 
 public class CallReceiver extends BroadcastReceiver {
     private static final String TAG = "CallReceiver";
-    public static final String API_URL = BuildConfig.BINA_API_URL;
-    public static final String API_IP = "204.216.163.47";
-    private static final MediaType JSON = MediaType.get("application/json; charset=utf-8");
-    private static final OkHttpClient client = new OkHttpClient();
+    private static final ServerApi api = new ServerApi();
 
     private static final IncomingCallTracker callTracker = new IncomingCallTracker();
 
@@ -93,9 +85,6 @@ public class CallReceiver extends BroadcastReceiver {
             saveLog(context, description + (event.phoneNumber.isEmpty() ? " - Número oculto" : ": " + event.phoneNumber));
             sendEventToAPI(context, event.type, description, event.phoneNumber,
                     event.receivingNumber, event.durationSeconds);
-            if ("CALL_RECEIVED".equals(event.type) && !event.phoneNumber.isEmpty()) {
-                sendWebhookLocal(context, event.phoneNumber);
-            }
         } catch (Exception e) {
             Log.e(TAG, "Erro no CallReceiver", e);
             saveLog(context, "Erro no monitoramento: " + e.getMessage());
@@ -142,65 +131,12 @@ public class CallReceiver extends BroadcastReceiver {
         return "Número desconhecido";
     }
 
-    private void sendWebhookLocal(Context context, String phoneNumber) {
-        try {
-            String savedIP = ConfigSingleton.getInstance().getIP();
-            if (savedIP == null || savedIP.isEmpty()) {
-                Log.i(TAG, "Servidor não configurado");
-                saveLog(context, "Servidor não configurado");
-                return;
-            }
-
-            String url = ConfigSingleton.getInstance().getUrl();
-            if (url == null || url.isEmpty()) {
-                Log.i(TAG, "URL não configurada");
-                saveLog(context, "URL não configurada");
-                return;
-            }
-
-            url = montaURL(phoneNumber, savedIP, url);
-            Log.i(TAG, "Enviando webhook para: " + url);
-            saveLog(context, "Enviando webhook para: " + url);
-
-            Request request = new Request.Builder()
-                    .url(url)
-                    .build();
-
-            client.newCall(request).enqueue(new Callback() {
-                @Override
-                public void onFailure(Call call, IOException e) {
-                    String errorMessage = "Falha ao enviar mensagem local para: " + phoneNumber + ". Erro: "
-                            + e.getMessage();
-                    saveLog(context, errorMessage);
-                    Log.e(TAG, errorMessage, e);
-                }
-
-                @Override
-                public void onResponse(@NotNull Call call, @NotNull Response response)  {
-                    String responseMessage;
-                    try (response) {
-                        if (response.isSuccessful()) {
-                            responseMessage = "Mensagem local enviada com sucesso para: " + phoneNumber;
-                            Log.i(TAG, responseMessage);
-                        } else {
-                            responseMessage = "Falha na resposta do servidor local para o número: " + phoneNumber + " - Código: " + response.code();
-                            Log.w(TAG, responseMessage);
-                        }
-                        saveLog(context, responseMessage);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            String exceptionMessage = "Erro ao preparar envio da mensagem local: " + e.getMessage();
-            saveLog(context, exceptionMessage);
-            Log.e(TAG, exceptionMessage, e);
-        }
-    }
-
     public static void sendEventToAPI(Context context, String eventType, String description, String phoneNumber,
             String receivingNumber, long duration) {
         try {
-            String deviceId = Settings.Secure.getString(context.getContentResolver(), Settings.Secure.ANDROID_ID);
+            AppSettings settings = new AppSettings(context);
+            EnvironmentConfig destination = settings.active();
+            String deviceId = settings.sourceId();
             String timestamp = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
 
             JSONObject additionalData = new JSONObject();
@@ -215,19 +151,15 @@ public class CallReceiver extends BroadcastReceiver {
             JSONObject json = new JSONObject();
             json.put("description", description);
             json.put("deviceId", deviceId);
+            json.put("sourceType", "android");
+            json.put("sourceId", deviceId);
             json.put("eventType", eventType);
             json.put("additionalData", additionalData.toString());
 
-            RequestBody body = RequestBody.create(json.toString(), JSON);
-            Request request = new Request.Builder()
-                    .url(API_URL)
-                    .post(body)
-                    .addHeader("Content-Type", "application/json")
-                    .build();
-
-            client.newCall(request).enqueue(new Callback() {
+            api.sendEvent(destination, json.toString(), new Callback() {
                 @Override
                 public void onFailure(@NotNull Call call, @NotNull IOException e) {
+                    settings.connection(destination, "Último envio falhou: " + e.getMessage());
                     String errorMessage = "Falha ao enviar evento para API. Erro: " + e.getMessage();
                     saveLog(context, errorMessage);
                     Log.e(TAG, errorMessage, e);
@@ -238,9 +170,11 @@ public class CallReceiver extends BroadcastReceiver {
                     String responseMessage;
                     try (response) {
                         if (response.isSuccessful()) {
+                            settings.connection(destination, "Último envio confirmado pelo servidor");
                             responseMessage = "Evento enviado com sucesso: " + eventType;
                             Log.i(TAG, responseMessage);
                         } else {
+                            settings.connection(destination, "Último envio falhou: HTTP " + response.code());
                             responseMessage = "Falha na resposta da API: " + response.code();
                             Log.w(TAG, responseMessage);
                         }
