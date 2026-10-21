@@ -37,6 +37,11 @@ public final class ServerApi {
     }
 
     public void sendEvent(EnvironmentConfig destination, String json, okhttp3.Callback callback) {
+        JsonObject envelope = JsonParser.parseString(json).getAsJsonObject();
+        if (envelope.has("eventType") && "TEST_CONNECTION".equals(envelope.get("eventType").getAsString())) {
+            addAppVersion(envelope);
+            json = envelope.toString();
+        }
         Request request = new Request.Builder().url(destination.eventsUrl())
                 .post(RequestBody.create(json, MediaType.get("application/json; charset=utf-8"))).build();
         client.newCall(request).enqueue(callback);
@@ -46,6 +51,7 @@ public final class ServerApi {
         JsonObject body = new JsonObject();
         body.addProperty("sourceType", "android");
         body.addProperty("sourceId", sourceId);
+        addAppVersion(body);
         body.addProperty("name", validateName(name));
         if (revision != null) body.addProperty("revision", revision);
         JsonElement result = execute(new Request.Builder().url(destination.sourcesUrl())
@@ -72,5 +78,10 @@ public final class ServerApi {
             try { return JsonParser.parseString(response.body().string()); }
             catch (RuntimeException e) { throw new IOException("Resposta inválida do servidor", e); }
         }
+    }
+
+    private static void addAppVersion(JsonObject body) {
+        body.addProperty("versionCode", BuildConfig.VERSION_CODE);
+        body.addProperty("versionName", BuildConfig.VERSION_NAME);
     }
 }
