@@ -9,6 +9,46 @@ import java.util.concurrent.atomic.AtomicReference;
 import static org.junit.Assert.*;
 
 public class ServerApiTest {
+    @Test public void durableQueueKeepsHttpFailuresAndUsesTheSameEnvelopeOnRecovery() throws Exception {
+        HttpServer server = HttpServer.create(new InetSocketAddress("127.0.0.1", 0), 0);
+        java.util.concurrent.atomic.AtomicInteger status = new java.util.concurrent.atomic.AtomicInteger(503);
+        java.util.List<String> received = new java.util.ArrayList<>();
+        server.createContext("/api/eventos", exchange -> {
+            assertEquals("POST", exchange.getRequestMethod());
+            received.add(new String(exchange.getRequestBody().readAllBytes(), StandardCharsets.UTF_8));
+            exchange.getResponseHeaders().set("Location", "/wrong-destination");
+            exchange.sendResponseHeaders(status.get(), -1);
+        });
+        server.start();
+        java.io.File directory = java.nio.file.Files.createTempDirectory("outbox-http").toFile();
+        java.io.File file = new java.io.File(directory, "calls");
+        try {
+            EnvironmentConfig destination = EnvironmentConfig.local("127.0.0.1", String.valueOf(server.getAddress().getPort()));
+            DurableCalls calls = new DurableCalls(file);
+            calls.record("RINGING", 1, "", "line", 1000, 100, "boot", destination, "device", "{}");
+            ServerApi api = new ServerApi();
+            calls.deliver(1000, api::sendQueuedEvent);
+            assertEquals(1, calls.pending().size());
+            assertTrue(calls.pending().get(0).error.contains("503"));
+            calls = new DurableCalls(file);
+            status.set(302);
+            calls.deliver(16000, api::sendQueuedEvent);
+            assertEquals(1, calls.pending().size());
+            assertTrue(calls.pending().get(0).error.contains("302"));
+            status.set(200);
+            calls.deliver(46000, api::sendQueuedEvent);
+            assertTrue(new DurableCalls(file).pending().isEmpty());
+            assertEquals(3, received.size());
+            assertEquals(received.get(0), received.get(1));
+            assertEquals(received.get(0), received.get(2));
+            calls.deliver(100000, (url, json) -> fail("Evento entregue não pode ser reenviado"));
+        } finally {
+            server.stop(0);
+            java.nio.file.Files.deleteIfExists(file.toPath());
+            java.nio.file.Files.deleteIfExists(directory.toPath());
+        }
+    }
+
     // Small HTTP/1.1 stub using only APIs present on Android's test compile classpath.
     private static final class HttpServer {
         private final java.net.ServerSocket listener = new java.net.ServerSocket();

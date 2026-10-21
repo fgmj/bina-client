@@ -31,6 +31,11 @@ final class SettingsController {
         activity.findViewById(R.id.buttonConfigure).setOnClickListener(v -> showSettings());
         activity.findViewById(R.id.buttonSyncName).setOnClickListener(v -> syncName());
         activity.findViewById(R.id.buttonTest).setOnClickListener(v -> test(settings.active(), null));
+        activity.findViewById(R.id.textConnection).setFocusable(true);
+        activity.findViewById(R.id.textConnection).setOnClickListener(v -> new AlertDialog.Builder(activity)
+                .setTitle("Fila de chamadas")
+                .setMessage(CallOutbox.status(activity, settings.active(), true))
+                .setPositiveButton("Fechar", null).show());
         refreshStatus();
     }
 
@@ -43,7 +48,7 @@ final class SettingsController {
         String name = settings.name(active);
         text(R.id.textDeviceName, name.isEmpty() ? "Aparelho sem nome — configure o cadastro"
                 : "Aparelho: " + name + (settings.nameSynced(active) ? "" : " (sincronização pendente)"));
-        text(R.id.textConnection, settings.connection(active));
+        text(R.id.textConnection, settings.connection(active) + "\n" + CallOutbox.status(activity, active, false));
         text(R.id.textMonitoring, !CallMonitorService.hasPhonePermissions(activity)
                 ? "Monitoramento indisponível: conceda as permissões de telefone"
                 : CallMonitorService.isRunning(activity) ? "Monitoramento ativo"

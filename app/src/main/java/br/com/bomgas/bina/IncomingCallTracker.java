@@ -3,7 +3,7 @@ package br.com.bomgas.bina;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Tracks the incoming call observable on each subscription while the process is alive. */
+/** Tracks observed incoming calls per subscription; DurableCalls persists this state atomically. */
 final class IncomingCallTracker {
     static final class Event {
         final String type;
@@ -31,6 +31,8 @@ final class IncomingCallTracker {
     }
 
     private final Map<Integer, Call> calls = new HashMap<>();
+
+    void forget(int subscriptionId) { calls.remove(subscriptionId); }
 
     Event ringing(int subscriptionId, String phoneNumber, String receivingNumber) {
         String number = phoneNumber == null ? "" : phoneNumber;

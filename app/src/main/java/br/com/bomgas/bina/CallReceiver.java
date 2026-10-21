@@ -17,78 +17,55 @@ import android.util.Log;
 import androidx.core.app.ActivityCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import org.jetbrains.annotations.NotNull;
 import org.json.JSONObject;
 
-import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
-import okhttp3.Call;
-import okhttp3.Callback;
-import okhttp3.Response;
 
 public class CallReceiver extends BroadcastReceiver {
     private static final String TAG = "CallReceiver";
-    private static final ServerApi api = new ServerApi();
-
-    private static final IncomingCallTracker callTracker = new IncomingCallTracker();
-
     @Override
     public void onReceive(Context context, Intent intent) {
         if (intent == null || !TelephonyManager.ACTION_PHONE_STATE_CHANGED.equals(intent.getAction())
-                || !CallMonitorService.hasPhonePermissions(context)) {
-            return;
-        }
-        try {
-            String state = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
-            int subscriptionId = intent.getIntExtra("subscription", -1);
-            IncomingCallTracker.Event event;
-            if (TelephonyManager.EXTRA_STATE_RINGING.equals(state)) {
-                // Android sends a second copy without this extra when both phone permissions exist.
-                if (!intent.hasExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)) {
-                    return;
-                }
-                String number = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
-                number = number == null ? "" : number.replaceAll("[^0-9+]", "");
-                if (!number.isEmpty() && !number.matches("\\+?[0-9]{1,15}")) {
-                    return;
-                }
-                event = callTracker.ringing(subscriptionId, number, getReceivingNumber(context, intent));
-            } else if (TelephonyManager.EXTRA_STATE_OFFHOOK.equals(state)) {
-                event = callTracker.answered(subscriptionId, SystemClock.elapsedRealtime());
-            } else if (TelephonyManager.EXTRA_STATE_IDLE.equals(state)) {
-                event = callTracker.ended(subscriptionId, SystemClock.elapsedRealtime());
-            } else {
-                return;
-            }
-            if (event == null) {
-                return;
-            }
-            String description;
-            switch (event.type) {
-                case "CALL_RECEIVED":
-                    description = "Chamada recebida";
-                    break;
-                case "CALL_ANSWERED_INCOMING":
-                    description = "Chamada recebida atendida";
-                    break;
-                case "CALL_MISSED":
-                    description = "Chamada não atendida";
-                    break;
-                default:
-                    description = "Chamada encerrada - Duração: " + formatDurationStatic(event.durationSeconds);
-                    break;
-            }
-            saveLog(context, description + (event.phoneNumber.isEmpty() ? " - Número oculto" : ": " + event.phoneNumber));
-            sendEventToAPI(context, event.type, description, event.phoneNumber,
-                    event.receivingNumber, event.durationSeconds);
-        } catch (Exception e) {
-            Log.e(TAG, "Erro no CallReceiver", e);
-            saveLog(context, "Erro no monitoramento: " + e.getMessage());
-        }
+                || !CallMonitorService.hasPhonePermissions(context)) return;
+        String transition = intent.getStringExtra(TelephonyManager.EXTRA_STATE);
+        if (!TelephonyManager.EXTRA_STATE_RINGING.equals(transition)
+                && !TelephonyManager.EXTRA_STATE_OFFHOOK.equals(transition)
+                && !TelephonyManager.EXTRA_STATE_IDLE.equals(transition)) return;
+        if (TelephonyManager.EXTRA_STATE_RINGING.equals(transition)
+                && !intent.hasExtra(TelephonyManager.EXTRA_INCOMING_NUMBER)) return;
+        String raw = intent.getStringExtra(TelephonyManager.EXTRA_INCOMING_NUMBER);
+        String number = raw == null ? "" : raw.replaceAll("[^0-9+]", "");
+        if (!number.isEmpty() && !number.matches("\\+?[0-9]{1,15}")) return;
+        long occurredAt = System.currentTimeMillis();
+        long elapsed = SystemClock.elapsedRealtime();
+        int subscription = intent.getIntExtra("subscription", -1);
+        AppSettings settings = new AppSettings(context);
+        EnvironmentConfig destination = settings.active();
+        String sourceId = settings.sourceId();
+        Context app = context.getApplicationContext();
+        PendingResult result = goAsync();
+        CallOutbox.RECORDING.execute(() -> {
+            try {
+                String boot = Integer.toString(android.provider.Settings.Global.getInt(
+                        app.getContentResolver(), android.provider.Settings.Global.BOOT_COUNT, -1));
+                JSONObject extra = new JSONObject();
+                extra.put("batteryLevel", getBatteryLevel(app));
+                extra.put("location", getLocation(app));
+                String description = CallOutbox.get(app).record(transition, subscription, number,
+                        getReceivingNumber(app, intent), occurredAt, elapsed, boot, destination, sourceId, extra.toString());
+                if (description != null) saveLog(app, description + " - salvo para entrega");
+                CallOutbox.schedule(app, 0);
+            } catch (Exception e) {
+                Log.e(TAG, "Falha ao preservar chamada", e);
+                app.getSharedPreferences("outbox-health", Context.MODE_PRIVATE).edit()
+                        .putString("error", "Falha ao preservar chamada: " + e.getMessage()).commit();
+                saveLog(app, "Falha ao preservar chamada: " + e.getMessage());
+            } finally { result.finish(); }
+        });
     }
     private String getReceivingNumber(Context context, Intent intent) {
         try {
@@ -129,64 +106,6 @@ public class CallReceiver extends BroadcastReceiver {
             Log.e(TAG, "Erro ao obter número do telefone: " + e.getMessage(), e);
         }
         return "Número desconhecido";
-    }
-
-    public static void sendEventToAPI(Context context, String eventType, String description, String phoneNumber,
-            String receivingNumber, long duration) {
-        try {
-            AppSettings settings = new AppSettings(context);
-            EnvironmentConfig destination = settings.active();
-            String deviceId = settings.sourceId();
-            String timestamp = new SimpleDateFormat("dd/MM/yyyy HH:mm:ss", Locale.getDefault()).format(new Date());
-
-            JSONObject additionalData = new JSONObject();
-            additionalData.put("numero", phoneNumber);
-            additionalData.put("data", timestamp);
-            additionalData.put("receivingNumber", receivingNumber);
-            additionalData.put("batteryLevel", getBatteryLevel(context));
-            additionalData.put("location", getLocation(context));
-            additionalData.put("duration", duration);
-            additionalData.put("durationFormatted", formatDurationStatic(duration));
-
-            JSONObject json = new JSONObject();
-            json.put("description", description);
-            json.put("deviceId", deviceId);
-            json.put("sourceType", "android");
-            json.put("sourceId", deviceId);
-            json.put("eventType", eventType);
-            json.put("additionalData", additionalData.toString());
-
-            api.sendEvent(destination, json.toString(), new Callback() {
-                @Override
-                public void onFailure(@NotNull Call call, @NotNull IOException e) {
-                    settings.connection(destination, "Último envio falhou: " + e.getMessage());
-                    String errorMessage = "Falha ao enviar evento para API. Erro: " + e.getMessage();
-                    saveLog(context, errorMessage);
-                    Log.e(TAG, errorMessage, e);
-                }
-
-                @Override
-                public void onResponse(@NotNull Call call, @NotNull Response response)  {
-                    String responseMessage;
-                    try (response) {
-                        if (response.isSuccessful()) {
-                            settings.connection(destination, "Último envio confirmado pelo servidor");
-                            responseMessage = "Evento enviado com sucesso: " + eventType;
-                            Log.i(TAG, responseMessage);
-                        } else {
-                            settings.connection(destination, "Último envio falhou: HTTP " + response.code());
-                            responseMessage = "Falha na resposta da API: " + response.code();
-                            Log.w(TAG, responseMessage);
-                        }
-                        saveLog(context, responseMessage);
-                    }
-                }
-            });
-        } catch (Exception e) {
-            String exceptionMessage = "Erro ao preparar envio para API: " + e.getMessage();
-            saveLog(context, exceptionMessage);
-            Log.e(TAG, exceptionMessage, e);
-        }
     }
 
     private static int getBatteryLevel(Context context) {

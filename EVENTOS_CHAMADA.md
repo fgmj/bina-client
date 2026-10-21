@@ -1,5 +1,9 @@
 # Monitoramento Android de chamadas recebidas
 
+> A persistência do ciclo e o envio em fila durável foram implementados no issue #4.
+> Consulte [comportamento, validação e limites atuais](docs/issue-4-validation.md).
+> As limitações de estado somente em memória abaixo descrevem a base `a777111`.
+
 > Documento do comportamento-base de `a777111`. O fluxo de configuração, o teste
 > de conexão e o envio paralelo à ponte descritos abaixo foram substituídos pelo
 > [fluxo do issue #3](docs/issue-3-validation.md). O ciclo telefônico permanece.

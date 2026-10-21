@@ -42,6 +42,15 @@ public final class ServerApi {
         client.newCall(request).enqueue(callback);
     }
 
+    /** Returns only after HTTP acceptance; a lost response leaves the same event pending. */
+    public void sendQueuedEvent(String originalUrl, String json) throws IOException {
+        Request request = new Request.Builder().url(originalUrl)
+                .post(RequestBody.create(json, MediaType.get("application/json; charset=utf-8"))).build();
+        try (Response response = client.newCall(request).execute()) {
+            if (!response.isSuccessful()) throw new IOException("Servidor respondeu HTTP " + response.code());
+        }
+    }
+
     public Registration register(EnvironmentConfig destination, String sourceId, String name, Long revision) throws IOException {
         JsonObject body = new JsonObject();
         body.addProperty("sourceType", "android");

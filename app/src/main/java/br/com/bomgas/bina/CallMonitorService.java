@@ -49,6 +49,7 @@ public class CallMonitorService extends Service {
         super.onCreate();
         startForeground(1, createNotification());
         running = true;
+        CallOutbox.schedule(this, 0);
     }
 
     @Override

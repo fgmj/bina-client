@@ -218,6 +218,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onStart() {
         super.onStart();
+        CallOutbox.schedule(this, 0);
         if (settingsController != null) settingsController.start();
         addLogEntry("Activity iniciada");
     }
