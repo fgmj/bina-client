@@ -31,6 +31,8 @@ final class SettingsController {
         activity.findViewById(R.id.buttonConfigure).setOnClickListener(v -> showSettings());
         activity.findViewById(R.id.buttonSyncName).setOnClickListener(v -> syncName());
         activity.findViewById(R.id.buttonTest).setOnClickListener(v -> test(settings.active(), null));
+        activity.findViewById(R.id.buttonMonitoringRecovery).setOnClickListener(v -> MonitoringRecovery.show(activity));
+        activity.findViewById(R.id.textMonitoring).setOnClickListener(v -> MonitoringRecovery.show(activity));
         activity.findViewById(R.id.textConnection).setFocusable(true);
         activity.findViewById(R.id.textConnection).setOnClickListener(v -> new AlertDialog.Builder(activity)
                 .setTitle("Fila de chamadas")
@@ -49,10 +51,9 @@ final class SettingsController {
         text(R.id.textDeviceName, name.isEmpty() ? "Aparelho sem nome — configure o cadastro"
                 : "Aparelho: " + name + (settings.nameSynced(active) ? "" : " (sincronização pendente)"));
         text(R.id.textConnection, settings.connection(active) + "\n" + CallOutbox.status(activity, active, false));
-        text(R.id.textMonitoring, !CallMonitorService.hasPhonePermissions(activity)
-                ? "Monitoramento indisponível: conceda as permissões de telefone"
-                : CallMonitorService.isRunning(activity) ? "Monitoramento ativo"
-                : "Monitoramento inativo — reabra o aplicativo para tentar iniciar");
+        MonitoringState monitoring = MonitoringRecovery.state(activity);
+        String error = activity.getSharedPreferences("monitor-health", 0).getString("error", "");
+        text(R.id.textMonitoring, monitoring.title + (error.isEmpty() ? "" : "\n" + error));
     }
 
     private void text(int id, String value) { ((TextView) activity.findViewById(id)).setText(value); }

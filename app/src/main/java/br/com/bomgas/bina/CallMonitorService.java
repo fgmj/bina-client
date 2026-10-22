@@ -19,7 +19,7 @@ import androidx.core.content.ContextCompat;
 
 public class CallMonitorService extends Service {
     private static final String TAG = "CallMonitorService";
-    private static final String CHANNEL_ID = "call_monitor";
+    static final String CHANNEL_ID = "call_monitor";
     private static volatile boolean running;
 
     static boolean isRunning(Context context) { return running && hasPhonePermissions(context); }
@@ -35,10 +35,12 @@ public class CallMonitorService extends Service {
         if (!hasPhonePermissions(context)) {
             return false;
         }
+        if (isRunning(context)) return true;
         try {
             ContextCompat.startForegroundService(context, new Intent(context, CallMonitorService.class));
             return true;
         } catch (RuntimeException e) {
+            recordFailure(context, e);
             Log.e(TAG, "Não foi possível iniciar o monitoramento; abra o aplicativo para tentar novamente", e);
             return false;
         }
@@ -47,19 +49,46 @@ public class CallMonitorService extends Service {
     @Override
     public void onCreate() {
         super.onCreate();
-        startForeground(1, createNotification());
-        running = true;
-        CallOutbox.schedule(this, 0);
+        if (!hasPhonePermissions(this)) {
+            stopSelf();
+            return;
+        }
+        try {
+            Notification notification = createNotification();
+            if (Build.VERSION.SDK_INT >= 34) {
+                startForeground(1, notification,
+                        android.content.pm.ServiceInfo.FOREGROUND_SERVICE_TYPE_SPECIAL_USE);
+            } else {
+                startForeground(1, notification);
+            }
+            running = true;
+            getSharedPreferences("monitor-health", MODE_PRIVATE).edit().remove("error").apply();
+        } catch (RuntimeException e) {
+            running = false;
+            recordFailure(this, e);
+            stopSelf();
+        }
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        if (!hasPhonePermissions(this)) {
+        if (!hasPhonePermissions(this) || !running) {
+            running = false;
+            stopForeground(STOP_FOREGROUND_REMOVE);
             stopSelf();
             return START_NOT_STICKY;
         }
         // CallReceiver is declared in the manifest. Registering it here would duplicate events.
+        CallOutbox.schedule(this, 0);
         return START_STICKY;
+    }
+
+    private static void recordFailure(Context context, RuntimeException error) {
+        Log.e(TAG, "Android recusou iniciar o serviço de monitoramento", error);
+        context.getSharedPreferences("monitor-health", MODE_PRIVATE).edit()
+                .putString("error", "Não foi possível iniciar o serviço ("
+                        + error.getClass().getSimpleName() + "). Tente retomar com o app aberto.")
+                .apply();
     }
 
     private Notification createNotification() {

@@ -9,6 +9,14 @@ import java.util.concurrent.TimeUnit;
 public final class UpdaterApplication extends Application {
     @Override public void onCreate() {
         super.onCreate();
+        // Process visibility is independent of the foreground service. Never stop capture on ON_STOP.
+        androidx.lifecycle.ProcessLifecycleOwner.get().getLifecycle().addObserver(
+                new androidx.lifecycle.DefaultLifecycleObserver() {
+                    @Override public void onStart(androidx.lifecycle.LifecycleOwner owner) {
+                        CallOutbox.schedule(UpdaterApplication.this, 0);
+                        CallMonitorService.start(UpdaterApplication.this);
+                    }
+                });
         try {
             Constraints network = new Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build();
             WorkManager manager = WorkManager.getInstance(this);

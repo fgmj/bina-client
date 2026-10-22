@@ -1,5 +1,9 @@
 # Monitoramento Android de chamadas recebidas
 
+> O issue #5 acrescenta tipo explícito do serviço, recuperação e estado visível.
+> Consulte a [matriz, os limites e a validação atual](docs/issue-5-validation.md).
+> As seções históricas abaixo não substituem esse registro.
+
 > A persistência do ciclo e o envio em fila durável foram implementados no issue #4.
 > Consulte [comportamento, validação e limites atuais](docs/issue-4-validation.md).
 > As limitações de estado somente em memória abaixo descrevem a base `a777111`.

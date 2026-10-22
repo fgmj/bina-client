@@ -115,6 +115,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void checkPermissions() {
         try {
+            // Optional location/notification permissions must not postpone telephone monitoring.
+            if (CallMonitorService.hasPhonePermissions(this)) startMonitoring();
             String[] requiredPermissions = {
                     Manifest.permission.READ_PHONE_STATE,
                     Manifest.permission.READ_CALL_LOG,
@@ -222,6 +224,13 @@ public class MainActivity extends AppCompatActivity {
         CallOutbox.schedule(this, 0);
         if (settingsController != null) settingsController.start();
         addLogEntry("Activity iniciada");
+    }
+
+    @Override
+    protected void onResume() {
+        super.onResume();
+        // Also recovers after returning from settings following a permanent permission denial.
+        if (CallMonitorService.hasPhonePermissions(this)) CallMonitorService.start(this);
     }
 
     @Override

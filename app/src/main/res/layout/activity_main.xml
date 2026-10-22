@@ -8,7 +8,8 @@
     <TextView android:id="@+id/textEnvironment" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="20sp" android:textStyle="bold" android:accessibilityLiveRegion="polite" />
     <TextView android:id="@+id/textDeviceName" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="18sp" />
     <TextView android:id="@+id/textConnection" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:accessibilityLiveRegion="polite" />
-    <TextView android:id="@+id/textMonitoring" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" />
+    <TextView android:id="@+id/textMonitoring" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:focusable="true" android:clickable="true" android:minHeight="48dp" android:accessibilityLiveRegion="polite" />
+    <Button android:id="@+id/buttonMonitoringRecovery" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Monitoramento e recuperação" />
     <Button android:id="@+id/buttonConfigure" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Configurar ambiente e aparelho" />
     <Button android:id="@+id/buttonSyncName" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Atualizar nome do servidor" />
 
