@@ -5,12 +5,17 @@ public final class MonitoringState {
     public final boolean canStart;
     public final String title;
     public final String details;
+    private final StatusSummary summary;
 
-    private MonitoringState(boolean canStart, String title, String details) {
+    private MonitoringState(boolean canStart, String title, String details, StatusSummary summary) {
         this.canStart = canStart;
         this.title = title;
         this.details = details;
+        this.summary = summary;
     }
+
+    /** Glanceable form of this state for the main screen card. */
+    public StatusSummary summary() { return summary; }
 
     public static MonitoringState assess(boolean phoneState, boolean callLog, boolean running,
                                          boolean notifications, boolean backgroundRestricted) {
@@ -26,12 +31,16 @@ public final class MonitoringState {
                     + (!callLog ? "Registro de chamadas (READ_CALL_LOG)" : "");
             return new MonitoringState(false, "Monitoramento indisponível",
                     "Permissões faltantes: " + missing.trim() + ". Abra as permissões do aplicativo.\n\n"
-                            + details + "\n" + limits);
+                            + details + "\n" + limits,
+                    new StatusSummary(StatusSummary.Tone.PROBLEM, "Sem permissão"));
         }
         String title = !running ? "Serviço de monitoramento parado"
                 : details.isEmpty() ? "Monitoramento ativo" : "Monitoramento ativo com alertas";
+        StatusSummary summary = !running ? new StatusSummary(StatusSummary.Tone.ATTENTION, "Parado")
+                : details.isEmpty() ? new StatusSummary(StatusSummary.Tone.OK, "Ativo")
+                : new StatusSummary(StatusSummary.Tone.ATTENTION, "Ativo com alertas");
         if (!running) details = "Retomar serviço solicita nova inicialização com o app aberto. "
                 + "A captura por broadcast e a entrega da fila são independentes do serviço e da tela principal.\n" + details;
-        return new MonitoringState(true, title, details + "\n" + limits);
+        return new MonitoringState(true, title, details + "\n" + limits, summary);
     }
 }
