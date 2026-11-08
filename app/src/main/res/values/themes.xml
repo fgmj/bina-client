@@ -77,7 +77,7 @@
         <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
     </style>
     <style name="TextAppearance.Bina.StatusTitle" parent="TextAppearance.Material3.LabelLarge">
-        <item name="android:textSize">13sp</item>
+        <item name="android:textSize">14sp</item>
     </style>
     <style name="TextAppearance.Bina.StatusValue" parent="TextAppearance.Material3.TitleSmall">
         <item name="android:textSize">16sp</item>

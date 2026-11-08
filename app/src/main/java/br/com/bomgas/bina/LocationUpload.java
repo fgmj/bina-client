@@ -39,7 +39,9 @@ final class LocationUpload {
             item.addProperty("latitude", point.latitude);
             item.addProperty("longitude", point.longitude);
             if (point.accuracy >= 0) item.addProperty("accuracy", point.accuracy);
-            item.addProperty("provider", point.provider);
+            // Contract: free text up to 32 characters, omitted when the system does not say.
+            if (point.provider != null && !point.provider.isEmpty())
+                item.addProperty("provider", point.provider.length() > 32 ? point.provider.substring(0, 32) : point.provider);
             item.addProperty("recordedAt", iso.format(new Date(point.recordedAt)));
             if (point.batteryLevel >= 0) item.addProperty("batteryLevel", point.batteryLevel);
             array.add(item);

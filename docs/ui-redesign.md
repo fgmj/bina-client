@@ -24,7 +24,9 @@ chamada atual), estados com **ícone + texto + cor** (nunca só cor), texto base
 ❓ **Q2 — Qual o elemento dominante da tela principal?** Hoje é um log técnico cinza.
 ➡️ Um **cartão de chamada** grande no topo: "Aguardando chamadas" quando ocioso;
 número formatado em 40sp com fundo âmbar quando está chamando; verde quando em
-atendimento; neutro com horário quando encerrada/perdida.
+atendimento; neutro com horário quando encerrada ("Última chamada"); vermelho com
+horário e botão **Retornar** quando perdida (revisado na code-review: chamada perdida
+exige ação, então ganha o tom de problema — sempre com ícone e texto, nunca só cor).
 
 ❓ **Q3 — Material 2 ou Material 3?** O projeto já depende de
 `com.google.android.material:1.12.0`, que traz `Theme.Material3.*`.
@@ -60,13 +62,14 @@ que `record` devolve um evento não nulo, numa chamada adicional isolada em
 `try/catch` própria. Não altera o que é gravado nem entregue. O feed guarda a
 chamada atual e as últimas 20, em `SharedPreferences` próprias (`call-feed`).
 Fase derivada só para exibição: RINGING→"Chamando", OFFHOOK→"Em atendimento",
-IDLE após atendimento→"Encerrada", IDLE sem atendimento→"Perdida".
+IDLE após atendimento→"Encerrada" (exibida como "Última chamada" no cartão e
+"Atendida" na lista), IDLE sem atendimento→"Perdida".
 
 ❓ **Q9 — Como mostrar serviço, conexão e fila sem texto corrido?**
 ➡️ Três **cartões de status** lado a lado (Monitoramento, Servidor, Fila), cada um
 com ícone, rótulo curto e tom (OK / Atenção / Problema / Neutro). Toque (≥48dp) abre
 o detalhe que já existia: `MonitoringRecovery.show`, diálogo da fila (agora com
-"Enviar agora" e "Testar conexão"). A classificação fica em classes puras testadas:
+"Enviar agora"; o diálogo do Servidor tem "Testar conexão" e "Configurar"). A classificação fica em classes puras testadas:
 `MonitoringState.level`, `ConnectionStatus.classify`, `QueueStatus`.
 
 ❓ **Q10 — E quando falta permissão ou o serviço parou?**
@@ -187,7 +190,7 @@ botão "Testar conexão" azul-claro com texto branco (contraste 2,6:1); versão.
 ### Configurações (diálogo)
 **Antes:** RadioButtons crus, EditTexts sem moldura, botão de atualizações solto.
 **Depois:** seções "Servidor", "Este aparelho", "Localização", "Atualizações";
-cartões de ambiente com descrição; campos com `TextInputLayout` e textos de ajuda;
+opções de ambiente (rádios Material com descrição no rótulo); campos com `TextInputLayout` e textos de ajuda;
 endereço/porta escondidos quando "Produção"; botão tonal "Verificar atualizações"
 com o mesmo comportamento; feedbacks com live region.
 
@@ -199,14 +202,59 @@ colorido. **Depois:** "Bina ativo — monitorando chamadas", "Recepção · Prod
 ## Seams de teste (TDD)
 
 Testes JVM em `app/src/test`, sem Robolectric:
-- `MonitoringState` (existente): ganhou `level` e `shortLabel`.
+- `MonitoringState` (existente): ganhou `summary()` (tom + rótulo curto), coberto em `StatusSummaryTest`.
 - `ConnectionStatus`: texto de conexão persistido → tom/rótulo.
 - `QueueStatus`: pendências → tom/rótulo.
 - `CallFeed`: transições → chamada atual e recentes; serialização.
 - `PhoneFormat`: formatação de números brasileiros para exibição.
 - `LocationQueue`: limite, intervalo mínimo, lote, confirmação, persistência.
-- `LocationUploadPolicy`: código HTTP → enviado / tentar de novo / sem suporte / descartar.
+- `LocationUpload.classify`/`payload`: código HTTP → enviado / tentar de novo / sem suporte / descartar.
+
+## Code review (skill code-review, eixos Standards e Spec)
+
+Corrigido antes do commit final:
+- `CallReceiver`: o feed de exibição passou a ser gravado **depois** de
+  `CallOutbox.schedule` — a entrega não espera mais o `commit()` do feed. O arquivo
+  agora é igual ao `main` mais uma linha no fim.
+- `LocationQueue`: se a gravação em disco falhar, memória volta ao estado anterior
+  (ponto não salvo não é enviado nem conta para o intervalo; confirmação não salva
+  mantém o ponto). Teste `failedWriteLeavesMemoryMatchingDisk`.
+- `LocationUploadWorker`: 400/413/422 também marcam "servidor com suporte" (o endpoint
+  existe); `RuntimeException` (ex.: endereço local inválido) vira `failure()` em vez de
+  retry infinito — o trabalho periódico de 15 min tenta de novo depois.
+- `LocationUpload.payload`: `provider` omitido quando vazio e cortado em 32 caracteres.
+- Android 11+: a tela de configurações do app só é aberta quando o sistema deixou de
+  perguntar (`shouldShowRequestPermissionRationale == false`); um "agora não" é respeitado.
+- Legendas dos cartões de status: 13sp → 14sp (Q14).
+
+Avaliado e mantido (decisão registrada):
+- "Escopo só apresentação" apontado para o rastreamento: o rastreamento é a Missão 2,
+  pedida explicitamente; ele não toca fila de chamadas, entrega nem updater.
+- A chave **Localização** aplica na hora (como uma chave do sistema), independente de
+  Salvar/Cancelar do diálogo: o pedido de permissão precisa acontecer no gesto.
+- "Enviar agora" chama `CallOutbox.schedule(…, 0)`, a mesma API que o `CallReceiver`
+  usa a cada evento — sem comportamento novo na fila.
+- Leituras pequenas na thread principal em `render()` (feed em `SharedPreferences`,
+  fila de localização carregada uma vez): custo baixo; ver pendências.
+- `ConnectionStatus.classify` lê o texto de conexão persistido por prefixo: é frágil
+  a mudanças de mensagem no `SettingsController`, mas evita mexer na classe protegida.
+  Testes em `StatusSummaryTest` travam os textos atuais.
+- Envio de localização sem cabeçalho de autenticação: igual aos endpoints atuais
+  (`/api/eventos`, `/api/origens`); registrado em `docs/api-needs.md` para o servidor.
 
 ## Pendências
 
-Ver seção final, atualizada ao término da implementação.
+- **Configurações em Activity própria** no lugar do diálogo — issue fgmj/bina-client#8.
+- **Ícones legados do launcher** (PNG `mipmap-*dpi`, usados abaixo do API 26) na nova
+  identidade — issue fgmj/bina-client#9.
+- **Servidor**: `POST /api/localizacoes` — issue fgmj/bina-cloud-server#14. Até lá o
+  client mostra "Aguardando suporte do servidor" e guarda até 7 dias de pontos.
+- Mover para fora da thread principal as leituras de `render()` (feed e fila de
+  localização) se aparecer jank em aparelhos fracos.
+- Trocar o `ConnectionStatus` por um estado estruturado quando `SettingsController`
+  puder ser refatorado.
+- Rastreamento desligado com pontos ainda guardados e servidor sem suporte: os pontos
+  só voltam a ser enviados quando o rastreio for religado ou o app enfileirar envio.
+- Validação manual em aparelho (não feita neste ambiente): fluxo de permissão em
+  Android 10, 11 e 13; modo escuro; TalkBack no cartão de chamada; notificação.
+- Capturas de tela para o PR (precisam de aparelho/emulador).

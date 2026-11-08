@@ -77,6 +77,7 @@ public final class LocationUploadWorker extends Worker {
                         return Result.success();
                     case DROP:
                         queue.acknowledge(ids);
+                        queue.markSupported(); // a 4xx about the data proves the endpoint exists
                         note(context, "Lote recusado pelo servidor e descartado (HTTP " + code + ")");
                         break;
                     default:
@@ -89,8 +90,11 @@ public final class LocationUploadWorker extends Worker {
             note(context, "Sem conexão para enviar localização: " + e.getMessage());
             return Result.retry();
         } catch (RuntimeException e) {
+            // E.g. an invalid local address: retrying with backoff would never succeed. The periodic
+            // work (15 min) and the next stored point try again after the operator fixes it.
             Log.w(TAG, "Falha inesperada no envio de localização", e);
-            return Result.retry();
+            note(context, "Falha ao enviar localização: " + e.getMessage());
+            return Result.failure();
         }
     }
 

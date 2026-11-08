@@ -80,4 +80,29 @@ public class LocationQueueTest {
         assertTrue(queue.offer(point(0)));
         assertTrue(new File(file + ".corrupt").exists());
     }
+
+    @Test public void failedWriteLeavesMemoryMatchingDisk() throws Exception {
+        File directory = new File(temporary.getRoot(), "blocked");
+        LocationQueue queue = new LocationQueue(new File(directory, "locations.json"));
+        assertTrue("a plain file where the directory should be makes every write fail", directory.createNewFile());
+        try {
+            queue.offer(point(0));
+            fail("write should fail");
+        } catch (java.io.IOException expected) { }
+        assertEquals("point that was not saved is not sent either", 0, queue.size());
+        assertTrue(directory.delete());
+        assertTrue("the failed point did not advance the sampling interval", queue.offer(point(MIN)));
+
+        String id = queue.batch(10).get(0).pointId;
+        assertTrue(directory.getAbsoluteFile().isDirectory());
+        File file = new File(directory, "locations.json");
+        assertTrue(file.delete());
+        assertTrue(directory.delete());
+        assertTrue(directory.createNewFile());
+        try {
+            queue.acknowledge(Arrays.asList(id));
+            fail("write should fail");
+        } catch (java.io.IOException expected) { }
+        assertEquals("acknowledgement that was not saved keeps the point", 1, queue.size());
+    }
 }

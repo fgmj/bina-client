@@ -75,8 +75,11 @@ final class LocationSettings {
             }
         } else if (requestCode == REQUEST_BACKGROUND) {
             LocationTracking.ensure(activity);
-            if (!LocationTracking.backgroundPermission(activity) && Build.VERSION.SDK_INT >= 30) {
-                // Denied twice the system stops asking: lead the operator to the app settings instead.
+            if (!LocationTracking.backgroundPermission(activity) && Build.VERSION.SDK_INT >= 30
+                    && !ActivityCompat.shouldShowRequestPermissionRationale(activity,
+                            Manifest.permission.ACCESS_BACKGROUND_LOCATION)) {
+                // The system stopped asking (denied repeatedly): lead the operator to the app settings.
+                // A single "not now" is respected and the section keeps the "Permitir" button.
                 Toast.makeText(activity, "Em Permissões › Localização, escolha \"Permitir o tempo todo\".",
                         Toast.LENGTH_LONG).show();
                 try {

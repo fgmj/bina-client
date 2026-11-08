@@ -45,6 +45,18 @@ public class LocationUploadTest {
         assertFalse(sent.has("batteryLevel"));
     }
 
+    @Test public void unknownProviderIsOmittedAndLongOnesAreCut() {
+        JsonObject unknown = only(LocationQueue.Point.of(1, 2, 3f, "", 0, 50));
+        assertFalse(unknown.has("provider"));
+        JsonObject longName = only(LocationQueue.Point.of(1, 2, 3f, "provedor-com-um-nome-bem-maior-que-32", 0, 50));
+        assertEquals(32, longName.get("provider").getAsString().length());
+    }
+
+    private static JsonObject only(LocationQueue.Point point) {
+        return JsonParser.parseString(LocationUpload.payload("d", 1, "1", Collections.singletonList(point)))
+                .getAsJsonObject().getAsJsonArray("points").get(0).getAsJsonObject();
+    }
+
     @Test public void endpointIsDerivedFromTheActiveEnvironment() {
         assertEquals(EnvironmentConfig.PRODUCTION_URL + "/api/localizacoes",
                 LocationUpload.url(EnvironmentConfig.production()));

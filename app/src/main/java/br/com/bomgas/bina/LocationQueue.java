@@ -88,10 +88,19 @@ final class LocationQueue {
     synchronized boolean offer(Point point) throws IOException {
         if (state.lastAcceptedAt != Long.MIN_VALUE && point.recordedAt - state.lastAcceptedAt < MIN_INTERVAL_MS
                 && point.recordedAt >= state.lastAcceptedAt) return false;
+        List<Point> before = new ArrayList<>(state.points);
+        long lastBefore = state.lastAcceptedAt;
         state.points.add(point);
         while (state.points.size() > CAPACITY) state.points.remove(0);
         state.lastAcceptedAt = point.recordedAt;
-        commit();
+        try {
+            commit();
+        } catch (IOException e) {
+            // Memory must match disk: an unsaved point is neither sent nor counted for the interval.
+            state.points = before;
+            state.lastAcceptedAt = lastBefore;
+            throw e;
+        }
         return true;
     }
 
@@ -101,7 +110,14 @@ final class LocationQueue {
 
     synchronized void acknowledge(Collection<String> ids) throws IOException {
         Set<String> sent = new HashSet<>(ids);
-        if (state.points.removeIf(point -> sent.contains(point.pointId))) commit();
+        List<Point> before = new ArrayList<>(state.points);
+        if (!state.points.removeIf(point -> sent.contains(point.pointId))) return;
+        try {
+            commit();
+        } catch (IOException e) {
+            state.points = before;
+            throw e;
+        }
     }
 
     synchronized int size() { return state.points.size(); }
