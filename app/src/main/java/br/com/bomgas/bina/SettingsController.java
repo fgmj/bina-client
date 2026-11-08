@@ -1,5 +1,10 @@
 package br.com.bomgas.bina;
 
+import android.content.Intent;
+import android.content.Context;
+import android.content.SharedPreferences;
+import android.widget.Button;
+import com.google.gson.JsonObject;
 import android.os.Handler;
 import android.os.Looper;
 import android.view.View;
@@ -110,6 +115,96 @@ final class SettingsController {
         });
     }
 
+    private void checkUpdates(AlertDialog dialog, Button button, TextView feedback) {
+        EnvironmentConfig environment = settings.active();
+        button.setEnabled(false);
+        button.setText("Verificando…");
+        feedback.setText("Verificando atualizações em " + environment.label() + "…");
+        // A dedicated task avoids queuing this explicit check behind registration requests.
+        new Thread(() -> {
+            JsonObject[] metadata = {null};
+            UpdatePolicy.Decision decision = UpdatePolicy.check(BuildConfig.VERSION_CODE, 0, true, () -> {
+                metadata[0] = UpdateClient.fetch(environment);
+                return metadata[0] == null ? null : UpdateClient.code(metadata[0]);
+            });
+            activity.runOnUiThread(() -> {
+                if (!updatesVisible(dialog)) return;
+                button.setEnabled(true);
+                button.setText("Verificar atualizações");
+                if (!sameUpdateEnvironment(environment)) {
+                    feedback.setText("Ambiente ativo alterado. Verifique novamente.");
+                    return;
+                }
+                switch (decision) {
+                    case CURRENT:
+                        feedback.setText("Você está na versão mais recente (" + BuildConfig.VERSION_NAME + ")");
+                        break;
+                    case UNAVAILABLE:
+                        feedback.setText("Nenhuma atualização publicada para este ambiente/canal.");
+                        break;
+                    case UPDATE:
+                        String message = "Nova versão disponível: " + metadata[0].get("versionName").getAsString() + " — instalar agora?";
+                        feedback.setText(message);
+                        new AlertDialog.Builder(activity).setMessage(message)
+                                .setPositiveButton("Instalar agora", (d, which) -> {
+                                    if (updatesVisible(dialog)) downloadUpdate(dialog, button, feedback, environment, metadata[0]);
+                                }).setNegativeButton("Agora não", null).show();
+                        break;
+                    default:
+                        feedback.setText("Não foi possível verificar atualizações. Verifique a conexão e o endpoint do ambiente ativo e tente novamente.");
+                }
+            });
+        }, "updater-manual-check").start();
+    }
+
+    private boolean updatesVisible(AlertDialog dialog) {
+        return dialog.isShowing() && !activity.isFinishing() && !activity.isDestroyed();
+    }
+
+    private boolean sameUpdateEnvironment(EnvironmentConfig environment) {
+        return UpdatePolicy.endpoint(environment).equals(UpdatePolicy.endpoint(settings.active()));
+    }
+
+    private void downloadUpdate(AlertDialog dialog, Button button, TextView feedback,
+            EnvironmentConfig environment, JsonObject metadata) {
+        button.setEnabled(false);
+        button.setText("Baixando…");
+        feedback.setText("Baixando e validando atualização…");
+        Context context = activity.getApplicationContext();
+        new Thread(() -> {
+            String error = null;
+            String key = UpdatePolicy.endpoint(environment);
+            try {
+                synchronized (UpdateWorker.LOCK) {
+                    if (!sameUpdateEnvironment(environment)) throw new IllegalStateException("Ambiente ativo alterado");
+                    UpdateClient.download(context, environment, metadata, () -> false);
+                    if (!sameUpdateEnvironment(environment)) throw new IllegalStateException("Ambiente ativo alterado");
+                    SharedPreferences state = context.getSharedPreferences(UpdateWorker.PREFS, Context.MODE_PRIVATE);
+                    long code = UpdateClient.code(metadata);
+                    if (!state.edit().putString("key", key).putLong("code", code)
+                            .putString("hash", metadata.get("sha256").getAsString()).remove("error")
+                            .putString("file", "update.apk")
+                            .putLong(key + "/offered", Math.max(code, state.getLong(key + "/offered", 0)))
+                            .commit()) throw new java.io.IOException("Não foi possível salvar a atualização");
+                }
+            } catch (Exception e) { error = "Não foi possível baixar/instalar a atualização: " + e.getMessage(); }
+            final String result = error;
+            activity.runOnUiThread(() -> {
+                if (!updatesVisible(dialog)) return;
+                button.setEnabled(true);
+                button.setText("Verificar atualizações");
+                if (result != null) { feedback.setText(result); return; }
+                if (!sameUpdateEnvironment(environment)) { feedback.setText("Ambiente ativo alterado. Verifique novamente."); return; }
+                feedback.setText("Atualização validada. Abrindo instalador…");
+                try {
+                    activity.startActivity(new Intent(activity, UpdateInstallActivity.class).putExtra("key", key));
+                } catch (RuntimeException e) {
+                    feedback.setText("Não foi possível abrir o instalador. Tente novamente.");
+                }
+            });
+        }, "updater-manual-download").start();
+    }
+
     private EnvironmentConfig selected(RadioGroup choice, EditText address, EditText port) {
         return choice.getCheckedRadioButtonId() == R.id.chooseLocal
                 ? EnvironmentConfig.local(address.getText().toString(), port.getText().toString())
@@ -147,6 +242,9 @@ final class SettingsController {
         AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("Ambiente e aparelho")
                 .setView(form).setPositiveButton("Salvar", null)
                 .setNeutralButton("Testar", null).setNegativeButton("Cancelar", null).create();
+        Button updates = form.findViewById(R.id.checkUpdates);
+        TextView updateFeedback = form.findViewById(R.id.updateFeedback);
+        updates.setOnClickListener(v -> checkUpdates(dialog, updates, updateFeedback));
         dialog.setOnShowListener(ignored -> {
             dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
                 try { test(selected(choice, address, port), feedback); }

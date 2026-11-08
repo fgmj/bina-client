@@ -11,6 +11,8 @@
         <EditText android:id="@+id/localPort" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="number" android:singleLine="true" android:maxLength="5" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Nome do aparelho neste servidor" android:labelFor="@id/deviceName" />
         <EditText android:id="@+id/deviceName" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textCapSentences" android:singleLine="true" android:maxLength="255" android:hint="Ex.: Recepção" />
+        <Button android:id="@+id/checkUpdates" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Verificar atualizações" />
+        <TextView android:id="@+id/updateFeedback" android:layout_width="match_parent" android:layout_height="wrap_content" android:accessibilityLiveRegion="polite" android:text="Consulta o ambiente ativo salvo. Salve antes de verificar outro ambiente." />
         <TextView android:id="@+id/settingsFeedback" android:layout_width="match_parent" android:layout_height="wrap_content" android:accessibilityLiveRegion="polite" android:text="Testar não altera o ambiente ativo. Salvar ativa o ambiente e cadastra o nome." />
     </LinearLayout>
 </ScrollView>

@@ -7,6 +7,23 @@ import java.security.NoSuchAlgorithmException;
 
 public final class UpdatePolicy {
     private UpdatePolicy() {}
+    public enum Decision { UPDATE, CURRENT, UNAVAILABLE, SUPPRESSED, ERROR }
+
+    /** Null denotes an endpoint without a published version; failures are reported separately. */
+    public static Decision decide(long installed, Long available, long offered, boolean manual) {
+        if (available == null) return Decision.UNAVAILABLE;
+        if (available <= 0) return Decision.ERROR;
+        if (available <= installed) return Decision.CURRENT;
+        return manual || shouldOffer(installed, available, offered) ? Decision.UPDATE : Decision.SUPPRESSED;
+    }
+
+    public static Decision check(long installed, long offered, boolean manual, VersionSource source) {
+        try { return decide(installed, source.available(), offered, manual); }
+        catch (Exception e) { return Decision.ERROR; }
+    }
+
+    public interface VersionSource { Long available() throws Exception; }
+
     public static boolean shouldOffer(long installed, long available, long offered) {
         return available > installed && available > offered;
     }

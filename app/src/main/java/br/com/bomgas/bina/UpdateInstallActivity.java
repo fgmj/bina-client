@@ -10,7 +10,7 @@ import android.util.Log;
 import androidx.core.content.FileProvider;
 import java.io.File;
 
-/** Only an explicit notification tap can launch the package installer. */
+/** Only an explicit notification tap or settings confirmation can launch the package installer. */
 public final class UpdateInstallActivity extends Activity {
     private boolean busy;
     @Override public void onCreate(Bundle saved) { super.onCreate(saved); }

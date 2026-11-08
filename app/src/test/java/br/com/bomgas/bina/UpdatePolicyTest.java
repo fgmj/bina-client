@@ -6,6 +6,28 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 
 public class UpdatePolicyTest {
+    @Test public void manualCheckCanOfferAnAlreadyOfferedNewerVersion() {
+        assertEquals(UpdatePolicy.Decision.UPDATE, UpdatePolicy.decide(12, 14L, 14, true));
+        assertEquals(UpdatePolicy.Decision.SUPPRESSED, UpdatePolicy.decide(12, 14L, 14, false));
+    }
+    @Test public void manualCheckReportsInstalledVersionAsCurrent() {
+        assertEquals(UpdatePolicy.Decision.CURRENT, UpdatePolicy.check(14, 0, true, () -> 14L));
+        assertEquals(UpdatePolicy.Decision.CURRENT, UpdatePolicy.check(15, 0, true, () -> 14L));
+    }
+    @Test public void manualCheckReportsNoPublishedUpdate() {
+        assertEquals(UpdatePolicy.Decision.UNAVAILABLE, UpdatePolicy.check(14, 0, true, () -> null));
+    }
+    @Test public void manualCheckRejectsInvalidRemoteVersion() {
+        assertEquals(UpdatePolicy.Decision.ERROR, UpdatePolicy.check(14, 0, true, () -> -1L));
+        assertEquals(UpdatePolicy.Decision.ERROR, UpdatePolicy.check(14, 0, true, () -> {
+            throw new IllegalArgumentException("invalid versionCode");
+        }));
+    }
+    @Test public void manualCheckReportsNetworkFailure() {
+        assertEquals(UpdatePolicy.Decision.ERROR, UpdatePolicy.check(14, 0, true, () -> {
+            throw new java.io.IOException("offline");
+        }));
+    }
     @Test public void offersOnlyHigherVersionCode() {
         assertTrue(UpdatePolicy.shouldOffer(12, 14, 0));
         assertFalse(UpdatePolicy.shouldOffer(14, 14, 0));
