@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The toolbar's dark overlay must not supply text colors to its light popup. -->
+    <style name="Widget.Bina.Toolbar" parent="Widget.Bina.Toolbar.Base">
+        <item name="popupTheme">@style/ThemeOverlay.Bina.Popup</item>
+    </style>
+
+    <style name="ThemeOverlay.Bina.Popup" parent="ThemeOverlay.Material3.Light">
+        <item name="colorSurface">@color/bina_surface_container</item>
+        <item name="colorSurfaceContainer">@color/bina_surface_container</item>
+        <item name="colorOnSurface">@color/bina_on_background</item>
+        <item name="colorOnSurfaceVariant">@color/bina_on_surface_variant</item>
+        <item name="android:textColorPrimary">@color/bina_on_background</item>
+        <item name="android:textColorSecondary">@color/bina_on_surface_variant</item>
+        <item name="colorControlNormal">@color/bina_on_surface_variant</item>
+    </style>
+
+    <!-- Keep the progress label readable while the action is temporarily disabled. -->
+    <style name="Widget.Bina.CheckUpdates" parent="Widget.Material3.Button.TonalButton">
+        <item name="android:textColor">@color/bina_on_secondary_container</item>
+        <item name="backgroundTint">@color/bina_secondary_container</item>
+    </style>
+</resources>
