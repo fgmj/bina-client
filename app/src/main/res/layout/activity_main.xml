@@ -1,57 +1,224 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-              android:layout_width="match_parent"
-              android:layout_height="match_parent"
-              android:orientation="vertical"
-              android:padding="16dp">
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical">
 
-    <TextView android:id="@+id/textEnvironment" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="20sp" android:textStyle="bold" android:accessibilityLiveRegion="polite" />
-    <TextView android:id="@+id/textDeviceName" android:layout_width="match_parent" android:layout_height="wrap_content" android:textSize="18sp" />
-    <TextView android:id="@+id/textConnection" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="8dp" android:accessibilityLiveRegion="polite" />
-    <TextView android:id="@+id/textMonitoring" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginBottom="8dp" android:focusable="true" android:clickable="true" android:minHeight="48dp" android:accessibilityLiveRegion="polite" />
-    <Button android:id="@+id/buttonMonitoringRecovery" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Monitoramento e recuperação" />
-    <Button android:id="@+id/buttonConfigure" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Configurar ambiente e aparelho" />
-    <Button android:id="@+id/buttonSyncName" android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Atualizar nome do servidor" />
+    <com.google.android.material.appbar.MaterialToolbar
+        android:id="@+id/toolbar"
+        style="@style/Widget.Bina.Toolbar"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:minHeight="?attr/actionBarSize"
+        android:theme="@style/ThemeOverlay.Bina.Toolbar"
+        app:title="@string/app_name" />
 
-    <!-- RecyclerView que ocupa a maior parte da tela -->
-    <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/recycler_view"
-            android:layout_width="match_parent"
-            android:layout_height="0dp"
-            android:layout_weight="1"
-            android:padding="8dp"
-            android:background="@android:color/darker_gray"
-            android:clipToPadding="false"/>
+    <androidx.core.widget.NestedScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:fillViewport="true">
 
-    <!-- Botão de Teste -->
-    <Button
-            android:id="@+id/buttonTest"
+        <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:text="Testar conexão"
-            android:padding="12dp"
-            android:elevation="2dp"
-            android:textColor="@android:color/white"
-            android:backgroundTint="@android:color/holo_blue_light"/>
+            android:orientation="vertical"
+            android:padding="16dp">
 
-
-    <!-- Container para alinhar a versão no canto inferior direito -->
-    <RelativeLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp">
-
-        <!-- Versão e Data de Build -->
-        <TextView
-                android:id="@+id/textVersion"
-                android:layout_width="wrap_content"
+            <!-- Banner: só aparece quando o operador precisa agir. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/actionBanner"
+                style="@style/Widget.Bina.Card"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="Versão 1.0 - 11/03/2025"
-                android:textSize="12sp"
-                android:textColor="@android:color/darker_gray"
-                android:layout_alignParentEnd="true"
-                android:layout_marginEnd="8dp"
-                android:layout_marginBottom="8dp"/>
-    </RelativeLayout>
+                android:layout_marginBottom="12dp"
+                android:visibility="gone"
+                app:cardBackgroundColor="@color/status_problem_container">
 
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:gravity="center_vertical"
+                    android:minHeight="56dp"
+                    android:orientation="horizontal"
+                    android:paddingStart="16dp"
+                    android:paddingEnd="8dp">
+
+                    <ImageView
+                        android:id="@+id/bannerIcon"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp"
+                        android:importantForAccessibility="no"
+                        android:src="@drawable/ic_warning"
+                        app:tint="@color/status_on_problem_container" />
+
+                    <TextView
+                        android:id="@+id/bannerText"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:layout_weight="1"
+                        android:accessibilityLiveRegion="polite"
+                        android:paddingVertical="12dp"
+                        android:textAppearance="@style/TextAppearance.Bina.Body"
+                        android:textColor="@color/status_on_problem_container" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/bannerAction"
+                        style="@style/Widget.Material3.Button.TextButton"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:minHeight="48dp"
+                        android:text="@string/banner_action"
+                        android:textColor="@color/status_on_problem_container"
+                        android:textStyle="bold" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- Cartão da chamada: o elemento dominante da tela. -->
+            <com.google.android.material.card.MaterialCardView
+                android:id="@+id/callCard"
+                style="@style/Widget.Bina.Card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:focusable="true"
+                app:cardCornerRadius="24dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:minHeight="184dp"
+                    android:orientation="vertical"
+                    android:padding="20dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:gravity="center_vertical"
+                        android:orientation="horizontal">
+
+                        <ImageView
+                            android:id="@+id/callIcon"
+                            android:layout_width="32dp"
+                            android:layout_height="32dp"
+                            android:importantForAccessibility="no"
+                            android:src="@drawable/ic_call_idle" />
+
+                        <TextView
+                            android:id="@+id/callPhase"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_marginStart="12dp"
+                            android:layout_weight="1"
+                            android:text="@string/call_waiting"
+                            android:textAppearance="@style/TextAppearance.Bina.CallPhase" />
+                    </LinearLayout>
+
+                    <TextView
+                        android:id="@+id/callNumber"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="16dp"
+                        app:autoSizeMaxTextSize="40sp"
+                        app:autoSizeMinTextSize="24sp"
+                        app:autoSizeTextType="uniform"
+                        android:maxLines="1"
+                        android:textAppearance="@style/TextAppearance.Bina.CallNumber"
+                        android:textIsSelectable="false"
+                        android:visibility="gone" />
+
+                    <TextView
+                        android:id="@+id/callDetail"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="8dp"
+                        android:text="@string/call_waiting_detail"
+                        android:textAppearance="@style/TextAppearance.Bina.Body" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/callBack"
+                        style="@style/Widget.Material3.Button"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="12dp"
+                        android:minHeight="48dp"
+                        android:text="@string/call_back"
+                        android:visibility="gone"
+                        app:icon="@drawable/ic_call_idle" />
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:baselineAligned="false"
+                android:orientation="horizontal">
+
+                <include
+                    android:id="@+id/cardMonitoring"
+                    layout="@layout/item_status_card"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/cardServer"
+                    layout="@layout/item_status_card"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginHorizontal="6dp"
+                    android:layout_weight="1" />
+
+                <include
+                    android:id="@+id/cardQueue"
+                    layout="@layout/item_status_card"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1" />
+            </LinearLayout>
+
+            <include
+                android:id="@+id/cardLocation"
+                layout="@layout/item_status_card"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="12dp"
+                android:visibility="gone" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="24dp"
+                android:layout_marginBottom="4dp"
+                android:accessibilityHeading="true"
+                android:text="@string/recent_calls"
+                android:textAppearance="@style/TextAppearance.Bina.Section" />
+
+            <TextView
+                android:id="@+id/recentEmpty"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:paddingVertical="12dp"
+                android:text="@string/recent_empty"
+                android:textAppearance="@style/TextAppearance.Bina.Caption" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recentCalls"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:nestedScrollingEnabled="false" />
+
+            <TextView
+                android:id="@+id/textVersion"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:gravity="center"
+                android:textAppearance="@style/TextAppearance.Bina.Caption" />
+        </LinearLayout>
+    </androidx.core.widget.NestedScrollView>
 </LinearLayout>

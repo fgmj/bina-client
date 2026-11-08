@@ -14,6 +14,8 @@
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+    <!-- Rastreamento opcional (opt-in) a cada 5 minutos com a tela desligada, Android 10+. -->
+    <uses-permission android:name="android.permission.ACCESS_BACKGROUND_LOCATION" />
 
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
 
@@ -64,6 +66,9 @@
 
             </intent-filter>
         </receiver>
+
+        <!-- Recebe as posições periódicas do LocationManager (PendingIntent explícito). -->
+        <receiver android:name=".LocationReceiver" android:exported="false" />
 
         <receiver android:name=".BootReceiver" android:exported="false">
             <intent-filter>

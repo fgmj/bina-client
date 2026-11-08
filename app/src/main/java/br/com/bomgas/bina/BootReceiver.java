@@ -11,6 +11,8 @@ public class BootReceiver extends BroadcastReceiver {
                 || Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction()))) {
             CallOutbox.schedule(context, 0);
             CallMonitorService.start(context);
+            // Location requests do not survive a reboot or an update; ensure() never throws.
+            LocationTracking.ensure(context);
         }
     }
 }

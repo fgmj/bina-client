@@ -6,6 +6,8 @@ import android.content.pm.PackageInfo;
 import android.content.pm.PackageManager;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.MenuItem;
+import android.widget.FrameLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -17,6 +19,8 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.google.android.material.appbar.MaterialToolbar;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.gson.Gson;
 import com.google.gson.reflect.TypeToken;
 
@@ -31,9 +35,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String TAG = "MainActivity";
 
     private SettingsController settingsController;
+    private MonitorScreen screen;
     private final List<String> logList = new ArrayList<>();
-    private RecyclerView recyclerView;
-    private LogAdapter logAdapter;
     private TextView textVersion;
 
     @Override
@@ -45,14 +48,14 @@ public class MainActivity extends AppCompatActivity {
 
         try {
             initializeViews();
-            setupRecyclerView();
             loadLogs();
-            settingsController = new SettingsController(this, this::addLogEntry);
+            screen = new MonitorScreen(this);
+            settingsController = new SettingsController(this, this::addLogEntry, screen::render);
+            setupActions();
             setupBroadcastReceiver();
             checkPermissions();
 
             addLogEntry("Aplicação iniciada com sucesso");
-            scrollToLastLog();
 
         } catch (Exception e) {
             Log.e(TAG, "Erro ao iniciar a aplicação: " + e.getMessage(), e);
@@ -63,7 +66,6 @@ public class MainActivity extends AppCompatActivity {
     private void initializeViews() {
         try {
             textVersion = findViewById(R.id.textVersion);
-            recyclerView = findViewById(R.id.recycler_view);
 
             setupVersionInfo();
 
@@ -73,15 +75,55 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void setupRecyclerView() {
-        try {
-            recyclerView.setLayoutManager(new LinearLayoutManager(this));
-            logAdapter = new LogAdapter(logList);
-            recyclerView.setAdapter(logAdapter);
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao configurar RecyclerView: " + e.getMessage(), e);
-            addLogEntry("Erro ao configurar lista de logs: " + e.getMessage());
-        }
+    private void setupActions() {
+        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        toolbar.inflateMenu(R.menu.main_menu);
+        toolbar.setOnMenuItemClickListener(this::onMenuItem);
+        screen.monitoringCard().setOnClickListener(v -> MonitoringRecovery.show(this));
+        screen.serverCard().setOnClickListener(v -> settingsController.showServer());
+        screen.queueCard().setOnClickListener(v -> settingsController.showQueue());
+        screen.locationCard().setOnClickListener(v -> settingsController.showSettings());
+        screen.bannerAction().setOnClickListener(v -> {
+            if (screen.shownBanner() == MonitorScreen.Banner.DEVICE_NAME) settingsController.showSettings();
+            else MonitoringRecovery.show(this);
+        });
+    }
+
+    private boolean onMenuItem(MenuItem item) {
+        int id = item.getItemId();
+        if (id == R.id.action_settings) settingsController.showSettings();
+        else if (id == R.id.action_test_connection) settingsController.testActive();
+        else if (id == R.id.action_sync_name) settingsController.syncNameNow();
+        else if (id == R.id.action_monitoring) MonitoringRecovery.show(this);
+        else if (id == R.id.action_log) showTechnicalLog();
+        else return false;
+        return true;
+    }
+
+    /** Support-oriented event log, moved off the main screen. */
+    private void showTechnicalLog() {
+        List<String> snapshot = new ArrayList<>(logList);
+        RecyclerView list = new RecyclerView(this);
+        list.setLayoutManager(new LinearLayoutManager(this));
+        list.setAdapter(new LogAdapter(snapshot));
+        int padding = (int) (16 * getResources().getDisplayMetrics().density);
+        list.setPadding(padding, 0, padding, 0);
+        FrameLayout container = new FrameLayout(this);
+        container.addView(list, new FrameLayout.LayoutParams(FrameLayout.LayoutParams.MATCH_PARENT,
+                (int) (420 * getResources().getDisplayMetrics().density)));
+        if (!snapshot.isEmpty()) list.scrollToPosition(snapshot.size() - 1);
+        new MaterialAlertDialogBuilder(this)
+                .setTitle(R.string.menu_log)
+                .setView(container)
+                .setPositiveButton("Fechar", null)
+                .setNeutralButton("Copiar", (dialog, which) -> {
+                    ClipboardManager clipboard = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+                    if (clipboard != null) {
+                        clipboard.setPrimaryClip(ClipData.newPlainText("Registro do Bina", String.join("\n", snapshot)));
+                        Toast.makeText(this, "Registro copiado", Toast.LENGTH_SHORT).show();
+                    }
+                })
+                .show();
     }
 
     private void setupVersionInfo() {
@@ -94,7 +136,7 @@ public class MainActivity extends AppCompatActivity {
                     .format(new Date(lastUpdateTime));
 
             if (textVersion != null) {
-                textVersion.setText(String.format("Versão %s - %s", versionName, buildDate));
+                textVersion.setText(String.format("Bina %s · instalado em %s", versionName, buildDate));
             }
 
         } catch (Exception e) {
@@ -176,10 +218,6 @@ public class MainActivity extends AppCompatActivity {
 
             runOnUiThread(() -> {
                 try {
-                    if (logAdapter != null) {
-                        logAdapter.notifyDataSetChanged();
-                    }
-                    scrollToLastLog();
                     saveLogs();
                 } catch (Exception e) {
                     Log.e(TAG, "Erro ao atualizar UI do log: " + e.getMessage(), e);
@@ -191,16 +229,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    private void scrollToLastLog() {
-        try {
-            if (recyclerView != null && !logList.isEmpty()) {
-                recyclerView.scrollToPosition(logList.size() - 1);
-            }
-        } catch (Exception e) {
-            Log.e(TAG, "Erro ao rolar para o último log: " + e.getMessage(), e);
-        }
-    }
-
     private final BroadcastReceiver logReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -209,6 +237,7 @@ public class MainActivity extends AppCompatActivity {
                     String message = intent.getStringExtra("message");
                     if (message != null) {
                         addLogEntry(message);
+                        if (screen != null) screen.render();
                     }
                 }
             } catch (Exception e) {
@@ -231,6 +260,8 @@ public class MainActivity extends AppCompatActivity {
         super.onResume();
         // Also recovers after returning from settings following a permanent permission denial.
         if (CallMonitorService.hasPhonePermissions(this)) CallMonitorService.start(this);
+        LocationTracking.ensure(this);
+        if (screen != null) screen.render();
     }
 
     @Override
@@ -254,6 +285,7 @@ public class MainActivity extends AppCompatActivity {
     public void onRequestPermissionsResult(int requestCode, @NonNull String[] permissions,
             @NonNull int[] grantResults) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults);
+        if (LocationSettings.onPermissionResult(this, requestCode)) return;
         try {
             if (requestCode == REQUEST_CODE_PERMISSIONS) {
                 boolean allGranted = true;

@@ -1,3 +1,43 @@
 <resources>
-    <string name="app_name">Cloud bina</string>
+    <string name="app_name">Bina</string>
+
+    <string name="menu_settings">Configurações</string>
+    <string name="menu_test_connection">Testar conexão</string>
+    <string name="menu_sync_name">Atualizar nome do servidor</string>
+    <string name="menu_monitoring">Monitoramento e recuperação</string>
+    <string name="menu_log">Registro técnico</string>
+
+    <string name="banner_action">Resolver</string>
+    <string name="call_waiting">Aguardando chamadas</string>
+    <string name="call_waiting_detail">O número aparece aqui assim que o telefone tocar.</string>
+    <string name="call_back">Retornar</string>
+    <string name="call_back_description">Retornar ligação para %1$s</string>
+
+    <string name="status_monitoring">Monitoramento</string>
+    <string name="status_server">Servidor</string>
+    <string name="status_queue">Envios</string>
+    <string name="status_location">Localização</string>
+    <string name="status_card_description">%1$s: %2$s. Toque para detalhes.</string>
+
+    <string name="recent_calls">Últimas chamadas</string>
+    <string name="recent_empty">Nenhuma chamada recebida ainda.</string>
+    <string name="number_copied">Número copiado</string>
+
+    <string name="settings_section_server">Servidor</string>
+    <string name="settings_production">Produção — servidor oficial na nuvem (recomendado)</string>
+    <string name="settings_local">Servidor local — na rede da empresa</string>
+    <string name="settings_local_address">Endereço do servidor</string>
+    <string name="settings_local_address_help">Ex.: 192.168.1.10 ou https://servidor (sem porta)</string>
+    <string name="settings_local_port">Porta</string>
+    <string name="settings_section_device">Este aparelho</string>
+    <string name="settings_device_name">Nome do aparelho</string>
+    <string name="settings_device_name_help">Aparece no monitor do computador. Ex.: Recepção</string>
+    <string name="settings_section_location">Localização</string>
+    <string name="settings_location_switch">Enviar localização a cada 5 minutos</string>
+    <string name="settings_location_help">Para acompanhar o aparelho em rota. Desligado por padrão. A posição vai só para o servidor ativo e fica guardada no aparelho enquanto não houver internet.</string>
+    <string name="settings_location_background">Permitir o tempo todo</string>
+    <string name="settings_section_updates">Atualizações</string>
+    <string name="settings_check_updates">Verificar atualizações</string>
+
+    <string name="notification_title">Bina ativo — monitorando chamadas</string>
 </resources>

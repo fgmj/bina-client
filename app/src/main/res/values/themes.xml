@@ -1,24 +1,86 @@
-<resources xmlns:tools="http://schemas.android.com/tools">
-    <!-- Base application theme. -->
-    <style name="Theme.Bomgasbina" parent="Theme.MaterialComponents.DayNight.DarkActionBar">
-        <!-- Primary brand color. -->
-        <item name="colorPrimary">@color/blue_500</item>
-        <item name="colorPrimaryVariant">@color/blue_700</item>
-        <item name="colorOnPrimary">@color/white</item>
+<resources>
+    <!-- Material 3, segue o modo claro/escuro do sistema. As cores vêm de values/ e values-night/. -->
+    <style name="Theme.Bomgasbina" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/bina_primary</item>
+        <item name="colorOnPrimary">@color/bina_on_primary</item>
+        <item name="colorPrimaryContainer">@color/bina_primary_container</item>
+        <item name="colorOnPrimaryContainer">@color/bina_on_primary_container</item>
+        <item name="colorSecondary">@color/bina_secondary</item>
+        <item name="colorOnSecondary">@color/bina_on_secondary</item>
+        <item name="colorSecondaryContainer">@color/bina_secondary_container</item>
+        <item name="colorOnSecondaryContainer">@color/bina_on_secondary_container</item>
+        <item name="colorError">@color/bina_error</item>
+        <item name="colorOnError">@color/bina_on_error</item>
+        <item name="colorErrorContainer">@color/bina_error_container</item>
+        <item name="colorOnErrorContainer">@color/bina_on_error_container</item>
+        <item name="android:colorBackground">@color/bina_background</item>
+        <item name="colorOnBackground">@color/bina_on_background</item>
+        <item name="colorSurface">@color/bina_background</item>
+        <item name="colorOnSurface">@color/bina_on_background</item>
+        <item name="colorSurfaceVariant">@color/bina_surface_container</item>
+        <item name="colorOnSurfaceVariant">@color/bina_on_surface_variant</item>
+        <item name="colorSurfaceContainer">@color/bina_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/bina_surface_container</item>
+        <item name="colorSurfaceContainerHighest">@color/bina_surface_container</item>
+        <item name="colorOutline">@color/bina_outline</item>
+        <item name="colorOutlineVariant">@color/bina_outline_variant</item>
+        <item name="android:windowBackground">@color/bina_background</item>
+        <item name="android:statusBarColor">@color/bina_toolbar</item>
+        <item name="android:navigationBarColor">@color/bina_background</item>
+    </style>
 
-        <!-- Secondary brand color. -->
-        <item name="colorSecondary">@color/cyan_200</item>
-        <item name="colorSecondaryVariant">@color/cyan_700</item>
-        <item name="colorOnSecondary">@color/black</item>
+    <style name="Widget.Bina.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:background">@color/bina_toolbar</item>
+        <item name="titleTextColor">@color/bina_on_toolbar</item>
+        <item name="subtitleTextColor">@color/bina_on_toolbar</item>
+        <item name="titleTextAppearance">@style/TextAppearance.Bina.ToolbarTitle</item>
+        <item name="subtitleTextAppearance">@style/TextAppearance.Bina.ToolbarSubtitle</item>
+    </style>
 
-        <!-- Background colors. -->
-        <item name="android:windowBackground">@color/white</item>
-        <item name="colorSurface">@color/blue_200</item>
-        <item name="colorOnSurface">@color/black</item>
+    <style name="ThemeOverlay.Bina.Toolbar" parent="ThemeOverlay.Material3.Dark.ActionBar">
+        <item name="colorControlNormal">@color/bina_on_toolbar</item>
+        <item name="colorOnSurface">@color/bina_on_toolbar</item>
+        <item name="colorOnSurfaceVariant">@color/bina_on_toolbar</item>
+    </style>
 
-        <!-- Status bar color. -->
-        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+    <style name="Widget.Bina.Card" parent="Widget.Material3.CardView.Filled">
+        <item name="cardBackgroundColor">@color/bina_surface_container</item>
+        <item name="cardCornerRadius">16dp</item>
+    </style>
 
-        <!-- Customize your theme here. -->
+    <!-- Tipografia: Roboto do sistema, tudo em sp para respeitar o tamanho de fonte do aparelho. -->
+    <style name="TextAppearance.Bina.ToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="TextAppearance.Bina.ToolbarSubtitle" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">14sp</item>
+    </style>
+    <style name="TextAppearance.Bina.CallNumber" parent="TextAppearance.Material3.DisplaySmall">
+        <item name="android:textSize">40sp</item>
+        <item name="android:textStyle">bold</item>
+        <item name="android:fontFeatureSettings">tnum</item>
+        <item name="android:letterSpacing">0</item>
+    </style>
+    <style name="TextAppearance.Bina.CallPhase" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textSize">18sp</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="TextAppearance.Bina.Section" parent="TextAppearance.Material3.TitleMedium">
+        <item name="android:textColor">?attr/colorPrimary</item>
+        <item name="android:textStyle">bold</item>
+    </style>
+    <style name="TextAppearance.Bina.Body" parent="TextAppearance.Material3.BodyLarge">
+        <item name="android:textSize">16sp</item>
+    </style>
+    <style name="TextAppearance.Bina.Caption" parent="TextAppearance.Material3.BodyMedium">
+        <item name="android:textSize">14sp</item>
+        <item name="android:textColor">?attr/colorOnSurfaceVariant</item>
+    </style>
+    <style name="TextAppearance.Bina.StatusTitle" parent="TextAppearance.Material3.LabelLarge">
+        <item name="android:textSize">13sp</item>
+    </style>
+    <style name="TextAppearance.Bina.StatusValue" parent="TextAppearance.Material3.TitleSmall">
+        <item name="android:textSize">16sp</item>
+        <item name="android:textStyle">bold</item>
     </style>
 </resources>

@@ -99,10 +99,22 @@ public class CallMonitorService extends Service {
         }
         PendingIntent openApp = PendingIntent.getActivity(this, 0,
                 new Intent(this, MainActivity.class), PendingIntent.FLAG_IMMUTABLE);
+        String where;
+        try {
+            where = DeviceLabel.describe(new AppSettings(this));
+        } catch (RuntimeException e) {
+            where = "Toque para abrir o Bina";
+        }
+        // Presentation only: channel, importance, id and ongoing flag are unchanged.
         return new NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("Monitoramento de chamadas ativo")
-                .setContentText("Toque para abrir o Bina")
-                .setSmallIcon(R.drawable.baseline_wifi_calling_3_24)
+                .setContentTitle(getString(R.string.notification_title))
+                .setContentText(where)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(where
+                        + "\nAs chamadas recebidas são enviadas ao computador. Toque para abrir."))
+                .setSmallIcon(R.drawable.ic_stat_bina)
+                .setColor(ContextCompat.getColor(this, R.color.bina_brand))
+                .setCategory(NotificationCompat.CATEGORY_SERVICE)
+                .setShowWhen(false)
                 .setContentIntent(openApp)
                 .setOngoing(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)

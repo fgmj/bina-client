@@ -13,6 +13,7 @@ import android.widget.RadioGroup;
 import android.widget.TextView;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.function.Consumer;
@@ -24,44 +25,50 @@ final class SettingsController {
     private final AppSettings settings;
     private final ServerApi api = new ServerApi();
     private final Consumer<String> log;
+    private final Runnable render;
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable refresh = new Runnable() {
         @Override public void run() { refreshStatus(); handler.postDelayed(this, 1500); }
     };
 
-    SettingsController(AppCompatActivity activity, Consumer<String> log) {
+    SettingsController(AppCompatActivity activity, Consumer<String> log, Runnable render) {
         this.activity = activity;
         this.log = log;
+        this.render = render;
         settings = new AppSettings(activity);
-        activity.findViewById(R.id.buttonConfigure).setOnClickListener(v -> showSettings());
-        activity.findViewById(R.id.buttonSyncName).setOnClickListener(v -> syncName());
-        activity.findViewById(R.id.buttonTest).setOnClickListener(v -> test(settings.active(), null));
-        activity.findViewById(R.id.buttonMonitoringRecovery).setOnClickListener(v -> MonitoringRecovery.show(activity));
-        activity.findViewById(R.id.textMonitoring).setOnClickListener(v -> MonitoringRecovery.show(activity));
-        activity.findViewById(R.id.textConnection).setFocusable(true);
-        activity.findViewById(R.id.textConnection).setOnClickListener(v -> new AlertDialog.Builder(activity)
-                .setTitle("Fila de chamadas")
-                .setMessage(CallOutbox.status(activity, settings.active(), true))
-                .setPositiveButton("Fechar", null).show());
         refreshStatus();
     }
 
     void start() { handler.removeCallbacks(refresh); handler.post(refresh); syncName(); }
     void stop() { handler.removeCallbacks(refresh); }
 
-    private void refreshStatus() {
-        EnvironmentConfig active = settings.active();
-        text(R.id.textEnvironment, "Ambiente ativo: " + active.label());
-        String name = settings.name(active);
-        text(R.id.textDeviceName, name.isEmpty() ? "Aparelho sem nome — configure o cadastro"
-                : "Aparelho: " + name + (settings.nameSynced(active) ? "" : " (sincronização pendente)"));
-        text(R.id.textConnection, settings.connection(active) + "\n" + CallOutbox.status(activity, active, false));
-        MonitoringState monitoring = MonitoringRecovery.state(activity);
-        String error = activity.getSharedPreferences("monitor-health", 0).getString("error", "");
-        text(R.id.textMonitoring, monitoring.title + (error.isEmpty() ? "" : "\n" + error));
+    /** Presentation lives in MonitorScreen; this keeps the original refresh points. */
+    private void refreshStatus() { render.run(); }
+
+    void syncNameNow() { syncName(); }
+
+    void testActive() { test(settings.active(), null); }
+
+    void showQueue() {
+        new MaterialAlertDialogBuilder(activity)
+                .setTitle("Envios de chamadas")
+                .setMessage(CallOutbox.status(activity, settings.active(), true))
+                .setPositiveButton("Enviar agora", (dialog, which) -> {
+                    CallOutbox.schedule(activity, 0);
+                    log.accept("Envio da fila solicitado");
+                })
+                .setNegativeButton("Fechar", null).show();
     }
 
-    private void text(int id, String value) { ((TextView) activity.findViewById(id)).setText(value); }
+    void showServer() {
+        EnvironmentConfig active = settings.active();
+        new MaterialAlertDialogBuilder(activity)
+                .setTitle("Servidor")
+                .setMessage("Ambiente ativo: " + active.label() + "\n\n" + settings.connection(active))
+                .setPositiveButton("Testar conexão", (dialog, which) -> testActive())
+                .setNeutralButton("Configurar", (dialog, which) -> showSettings())
+                .setNegativeButton("Fechar", null).show();
+    }
 
     private void syncName() {
         EnvironmentConfig active = settings.active();
@@ -145,7 +152,7 @@ final class SettingsController {
                     case UPDATE:
                         String message = "Nova versão disponível: " + metadata[0].get("versionName").getAsString() + " — instalar agora?";
                         feedback.setText(message);
-                        new AlertDialog.Builder(activity).setMessage(message)
+                        new MaterialAlertDialogBuilder(activity).setMessage(message)
                                 .setPositiveButton("Instalar agora", (d, which) -> {
                                     if (updatesVisible(dialog)) downloadUpdate(dialog, button, feedback, environment, metadata[0]);
                                 }).setNegativeButton("Agora não", null).show();
@@ -211,7 +218,7 @@ final class SettingsController {
                 : EnvironmentConfig.production();
     }
 
-    private void showSettings() {
+    void showSettings() {
         View form = activity.getLayoutInflater().inflate(R.layout.dialog_settings, null);
         RadioGroup choice = form.findViewById(R.id.environmentChoice);
         EditText address = form.findViewById(R.id.localAddress);
@@ -225,12 +232,16 @@ final class SettingsController {
         port.setText(settings.localPort());
         name.setText(settings.name(active));
         choice.check(active.local ? R.id.chooseLocal : R.id.chooseProduction);
+        View localFields = form.findViewById(R.id.localFields);
         address.setEnabled(active.local);
         port.setEnabled(active.local);
+        localFields.setVisibility(active.local ? View.VISIBLE : View.GONE);
+        LocationSettings.bind(activity, form);
         choice.setOnCheckedChangeListener((group, checked) -> {
             boolean local = checked == R.id.chooseLocal;
             address.setEnabled(local);
             port.setEnabled(local);
+            localFields.setVisibility(local ? View.VISIBLE : View.GONE);
             try {
                 EnvironmentConfig editing = selected(choice, address, port);
                 name.setText(settings.name(editing));
@@ -239,7 +250,7 @@ final class SettingsController {
             }
             catch (IllegalArgumentException ignored) { name.setText(""); }
         });
-        AlertDialog dialog = new AlertDialog.Builder(activity).setTitle("Ambiente e aparelho")
+        AlertDialog dialog = new MaterialAlertDialogBuilder(activity).setTitle("Configurações")
                 .setView(form).setPositiveButton("Salvar", null)
                 .setNeutralButton("Testar", null).setNegativeButton("Cancelar", null).create();
         Button updates = form.findViewById(R.id.checkUpdates);

@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bina_primary">#4FD8DE</color>
+    <color name="bina_on_primary">#003739</color>
+    <color name="bina_primary_container">#004F53</color>
+    <color name="bina_on_primary_container">#9CF0F4</color>
+    <color name="bina_secondary">#B1CBCD</color>
+    <color name="bina_on_secondary">#1C3436</color>
+    <color name="bina_secondary_container">#324B4D</color>
+    <color name="bina_on_secondary_container">#CCE8E9</color>
+    <color name="bina_background">#0E1415</color>
+    <color name="bina_on_background">#DDE4E4</color>
+    <color name="bina_surface_container">#1A2121</color>
+    <color name="bina_on_surface_variant">#BEC8C9</color>
+    <color name="bina_outline">#889393</color>
+    <color name="bina_outline_variant">#3F4949</color>
+    <color name="bina_error">#FFB4AB</color>
+    <color name="bina_on_error">#690005</color>
+    <color name="bina_error_container">#93000A</color>
+    <color name="bina_on_error_container">#FFDAD6</color>
+    <color name="bina_toolbar">#1A2121</color>
+    <color name="bina_on_toolbar">#DDE4E4</color>
+
+    <color name="status_ok_container">#005228</color>
+    <color name="status_on_ok_container">#B7F1C6</color>
+    <color name="status_neutral_container">#324B4D</color>
+    <color name="status_on_neutral_container">#CCE8E9</color>
+    <color name="status_attention_container">#594400</color>
+    <color name="status_on_attention_container">#FFE08B</color>
+    <color name="status_problem_container">#93000A</color>
+    <color name="status_on_problem_container">#FFDAD6</color>
+    <color name="call_ringing_container">#5C3A00</color>
+    <color name="call_on_ringing_container">#FFDDB5</color>
+</resources>

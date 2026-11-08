@@ -2,12 +2,12 @@ package br.com.bomgas.bina;
 
 import com.google.gson.Gson;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.AtomicMoveNotSupportedException;
-import java.nio.file.Files;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -54,24 +54,33 @@ final class LocationQueue {
     }
 
     private final Gson gson = new Gson();
-    private final File file;
+    private final File file, backup;
     private State state;
 
+    /** java.io only: java.nio.file is unavailable before API 26 (minSdk is 24). */
     LocationQueue(File file) throws IOException {
         this.file = file;
+        backup = new File(file + ".bak");
+        // Same protocol as DurableCalls: a backup means the last replacement was interrupted.
+        if (backup.exists()) {
+            if (file.exists() && !file.delete()) throw new IOException("Falha ao recuperar localizações");
+            if (!backup.renameTo(file)) throw new IOException("Falha ao restaurar localizações");
+        }
         state = load();
     }
 
     private State load() throws IOException {
         if (!file.exists()) return new State();
-        try {
-            State loaded = gson.fromJson(new String(Files.readAllBytes(file.toPath()), StandardCharsets.UTF_8), State.class);
+        try (Reader input = new InputStreamReader(new FileInputStream(file), StandardCharsets.UTF_8)) {
+            State loaded = gson.fromJson(input, State.class);
             if (loaded == null || loaded.points == null) throw new IllegalStateException("incompleto");
             loaded.points.removeIf(point -> point == null || point.pointId == null);
             return loaded;
         } catch (RuntimeException e) {
             // Losing old tracking points is preferable to never tracking again; keep the file for support.
-            Files.move(file.toPath(), new File(file + ".corrupt").toPath(), StandardCopyOption.REPLACE_EXISTING);
+            File corrupt = new File(file + ".corrupt");
+            if (corrupt.exists() && !corrupt.delete()) throw new IOException("Falha ao isolar localizações ilegíveis");
+            if (!file.renameTo(corrupt)) throw new IOException("Falha ao isolar localizações ilegíveis");
             return new State();
         }
     }
@@ -119,15 +128,15 @@ final class LocationQueue {
     private void commit() throws IOException {
         File parent = file.getAbsoluteFile().getParentFile();
         if (!parent.isDirectory() && !parent.mkdirs()) throw new IOException("Sem diretório para localizações");
-        File temporary = new File(file + ".tmp");
-        try (FileOutputStream output = new FileOutputStream(temporary)) {
+        if (file.exists() && !file.renameTo(backup)) throw new IOException("Falha ao proteger localizações");
+        try (FileOutputStream output = new FileOutputStream(file)) {
             output.write(gson.toJson(state).getBytes(StandardCharsets.UTF_8));
             output.getFD().sync();
+        } catch (IOException e) {
+            if (file.exists() && !file.delete()) e.addSuppressed(new IOException("Falha ao remover gravação incompleta"));
+            if (backup.exists() && !backup.renameTo(file)) e.addSuppressed(new IOException("Falha ao restaurar localizações"));
+            throw e;
         }
-        try {
-            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING, StandardCopyOption.ATOMIC_MOVE);
-        } catch (AtomicMoveNotSupportedException e) {
-            Files.move(temporary.toPath(), file.toPath(), StandardCopyOption.REPLACE_EXISTING);
-        }
+        if (backup.exists() && !backup.delete()) throw new IOException("Falha ao confirmar localizações");
     }
 }

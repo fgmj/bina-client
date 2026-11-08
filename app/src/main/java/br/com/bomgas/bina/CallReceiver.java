@@ -57,6 +57,8 @@ public class CallReceiver extends BroadcastReceiver {
                 extra.put("location", getLocation(app));
                 String description = CallOutbox.get(app).record(transition, subscription, number,
                         getReceivingNumber(app, intent), occurredAt, elapsed, boot, destination, sourceId, extra.toString());
+                // Display-only feed, updated after the event is durable; it swallows its own failures.
+                if (description != null) CallFeedStore.record(app, transition, subscription, number, occurredAt);
                 if (description != null) saveLog(app, description + " - salvo para entrega");
                 CallOutbox.schedule(app, 0);
             } catch (Exception e) {

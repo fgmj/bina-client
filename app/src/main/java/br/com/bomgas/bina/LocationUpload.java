@@ -38,7 +38,7 @@ final class LocationUpload {
             item.addProperty("pointId", point.pointId);
             item.addProperty("latitude", point.latitude);
             item.addProperty("longitude", point.longitude);
-            item.addProperty("accuracy", point.accuracy);
+            if (point.accuracy >= 0) item.addProperty("accuracy", point.accuracy);
             item.addProperty("provider", point.provider);
             item.addProperty("recordedAt", iso.format(new Date(point.recordedAt)));
             if (point.batteryLevel >= 0) item.addProperty("batteryLevel", point.batteryLevel);

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <item
+        android:id="@+id/action_settings"
+        android:icon="@drawable/ic_settings"
+        android:title="@string/menu_settings"
+        app:showAsAction="always" />
+    <item
+        android:id="@+id/action_test_connection"
+        android:title="@string/menu_test_connection"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_sync_name"
+        android:title="@string/menu_sync_name"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_monitoring"
+        android:title="@string/menu_monitoring"
+        app:showAsAction="never" />
+    <item
+        android:id="@+id/action_log"
+        android:title="@string/menu_log"
+        app:showAsAction="never" />
+</menu>
