@@ -51,6 +51,7 @@ public class MainActivity extends AppCompatActivity {
             loadLogs();
             screen = new MonitorScreen(this);
             settingsController = new SettingsController(this, this::addLogEntry, screen::render);
+            settingsController.restoreNavigation(savedInstanceState);
             setupActions();
             setupBroadcastReceiver();
             checkPermissions();
@@ -268,6 +269,12 @@ public class MainActivity extends AppCompatActivity {
     protected void onStop() {
         if (settingsController != null) settingsController.stop();
         super.onStop();
+    }
+
+    @Override
+    protected void onSaveInstanceState(@NonNull Bundle state) {
+        if (settingsController != null) settingsController.saveNavigation(state);
+        super.onSaveInstanceState(state);
     }
 
     @Override

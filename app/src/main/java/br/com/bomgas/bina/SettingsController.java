@@ -11,7 +11,7 @@ import android.view.View;
 import android.widget.EditText;
 import android.widget.RadioGroup;
 import android.widget.TextView;
-import androidx.appcompat.app.AlertDialog;
+import android.os.Bundle;
 import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import java.util.concurrent.ExecutorService;
@@ -39,7 +39,24 @@ final class SettingsController {
         refreshStatus();
     }
 
-    void start() { handler.removeCallbacks(refresh); handler.post(refresh); syncName(); }
+    private boolean returningFromSettings;
+
+    void restoreNavigation(Bundle state) {
+        returningFromSettings = state != null && state.getBoolean("returningFromSettings");
+    }
+
+    void saveNavigation(Bundle state) {
+        state.putBoolean("returningFromSettings", returningFromSettings);
+    }
+
+    void start() {
+        handler.removeCallbacks(refresh);
+        handler.post(refresh);
+        // Saving already starts a registration with the revision from the form.
+        // A second registration here would supersede its token before the reply arrives.
+        if (!returningFromSettings) syncName();
+        returningFromSettings = false;
+    }
     void stop() { handler.removeCallbacks(refresh); }
 
     /** Presentation lives in MonitorScreen; this keeps the original refresh points. */
@@ -122,7 +139,7 @@ final class SettingsController {
         });
     }
 
-    private void checkUpdates(AlertDialog dialog, Button button, TextView feedback) {
+    private void checkUpdates(Button button, TextView feedback) {
         EnvironmentConfig environment = settings.active();
         button.setEnabled(false);
         button.setText("Verificando…");
@@ -135,9 +152,13 @@ final class SettingsController {
                 return metadata[0] == null ? null : UpdateClient.code(metadata[0]);
             });
             activity.runOnUiThread(() -> {
-                if (!updatesVisible(dialog)) return;
+                if (activity.isDestroyed()) return;
                 button.setEnabled(true);
                 button.setText("Verificar atualizações");
+                if (!updatesVisible()) {
+                    feedback.setText("Verificação interrompida. Verifique novamente.");
+                    return;
+                }
                 if (!sameUpdateEnvironment(environment)) {
                     feedback.setText("Ambiente ativo alterado. Verifique novamente.");
                     return;
@@ -154,7 +175,7 @@ final class SettingsController {
                         feedback.setText(message);
                         new MaterialAlertDialogBuilder(activity).setMessage(message)
                                 .setPositiveButton("Instalar agora", (d, which) -> {
-                                    if (updatesVisible(dialog)) downloadUpdate(dialog, button, feedback, environment, metadata[0]);
+                                    if (updatesVisible()) downloadUpdate(button, feedback, environment, metadata[0]);
                                 }).setNegativeButton("Agora não", null).show();
                         break;
                     default:
@@ -164,15 +185,16 @@ final class SettingsController {
         }, "updater-manual-check").start();
     }
 
-    private boolean updatesVisible(AlertDialog dialog) {
-        return dialog.isShowing() && !activity.isFinishing() && !activity.isDestroyed();
+    private boolean updatesVisible() {
+        return activity.getLifecycle().getCurrentState().isAtLeast(androidx.lifecycle.Lifecycle.State.STARTED)
+                && !activity.isFinishing() && !activity.isDestroyed();
     }
 
     private boolean sameUpdateEnvironment(EnvironmentConfig environment) {
         return UpdatePolicy.endpoint(environment).equals(UpdatePolicy.endpoint(settings.active()));
     }
 
-    private void downloadUpdate(AlertDialog dialog, Button button, TextView feedback,
+    private void downloadUpdate(Button button, TextView feedback,
             EnvironmentConfig environment, JsonObject metadata) {
         button.setEnabled(false);
         button.setText("Baixando…");
@@ -197,9 +219,13 @@ final class SettingsController {
             } catch (Exception e) { error = "Não foi possível baixar/instalar a atualização: " + e.getMessage(); }
             final String result = error;
             activity.runOnUiThread(() -> {
-                if (!updatesVisible(dialog)) return;
+                if (activity.isDestroyed()) return;
                 button.setEnabled(true);
                 button.setText("Verificar atualizações");
+                if (!updatesVisible()) {
+                    feedback.setText("Download concluído ou interrompido. Verifique novamente.");
+                    return;
+                }
                 if (result != null) { feedback.setText(result); return; }
                 if (!sameUpdateEnvironment(environment)) { feedback.setText("Ambiente ativo alterado. Verifique novamente."); return; }
                 feedback.setText("Atualização validada. Abrindo instalador…");
@@ -219,7 +245,15 @@ final class SettingsController {
     }
 
     void showSettings() {
-        View form = activity.getLayoutInflater().inflate(R.layout.dialog_settings, null);
+        returningFromSettings = true;
+        activity.startActivity(new Intent(activity, SettingsActivity.class));
+    }
+
+    private Runnable persistDraft;
+
+    void saveDraft() { if (persistDraft != null) persistDraft.run(); }
+
+    void bindSettings(View form, Bundle draft, Consumer<Bundle> storeDraft, Runnable saved) {
         RadioGroup choice = form.findViewById(R.id.environmentChoice);
         EditText address = form.findViewById(R.id.localAddress);
         EditText port = form.findViewById(R.id.localPort);
@@ -233,9 +267,31 @@ final class SettingsController {
         name.setText(settings.name(active));
         choice.check(active.local ? R.id.chooseLocal : R.id.chooseProduction);
         View localFields = form.findViewById(R.id.localFields);
-        address.setEnabled(active.local);
-        port.setEnabled(active.local);
-        localFields.setVisibility(active.local ? View.VISIBLE : View.GONE);
+        if (draft != null) {
+            address.setText(draft.getString("address"));
+            port.setText(draft.getString("port"));
+            name.setText(draft.getString("name"));
+            choice.check(draft.getBoolean("local") ? R.id.chooseLocal : R.id.chooseProduction);
+            editingBase[0] = draft.getString("base");
+            editingRevision[0] = draft.containsKey("revision") ? draft.getLong("revision") : null;
+        }
+        Runnable showLocal = () -> {
+            boolean local = choice.getCheckedRadioButtonId() == R.id.chooseLocal;
+            address.setEnabled(local);
+            port.setEnabled(local);
+            localFields.setVisibility(local ? View.VISIBLE : View.GONE);
+        };
+        showLocal.run();
+        persistDraft = () -> {
+            Bundle state = new Bundle();
+            state.putString("address", address.getText().toString());
+            state.putString("port", port.getText().toString());
+            state.putString("name", name.getText().toString());
+            state.putBoolean("local", choice.getCheckedRadioButtonId() == R.id.chooseLocal);
+            state.putString("base", editingBase[0]);
+            if (editingRevision[0] != null) state.putLong("revision", editingRevision[0]);
+            storeDraft.accept(state);
+        };
         LocationSettings.bind(activity, form);
         choice.setOnCheckedChangeListener((group, checked) -> {
             boolean local = checked == R.id.chooseLocal;
@@ -250,29 +306,24 @@ final class SettingsController {
             }
             catch (IllegalArgumentException ignored) { name.setText(""); }
         });
-        AlertDialog dialog = new MaterialAlertDialogBuilder(activity).setTitle("Configurações")
-                .setView(form).setPositiveButton("Salvar", null)
-                .setNeutralButton("Testar", null).setNegativeButton("Cancelar", null).create();
         Button updates = form.findViewById(R.id.checkUpdates);
         TextView updateFeedback = form.findViewById(R.id.updateFeedback);
-        updates.setOnClickListener(v -> checkUpdates(dialog, updates, updateFeedback));
-        dialog.setOnShowListener(ignored -> {
-            dialog.getButton(AlertDialog.BUTTON_NEUTRAL).setOnClickListener(v -> {
-                try { test(selected(choice, address, port), feedback); }
-                catch (IllegalArgumentException e) { feedback.setText(e.getMessage()); }
-            });
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
-                try {
-                    EnvironmentConfig destination = selected(choice, address, port);
-                    String validName = ServerApi.validateName(name.getText().toString());
-                    settings.select(destination);
-                    // Use the revision shown when editing began, never a newer background refresh.
-                    register(destination, validName, destination.baseUrl().equals(editingBase[0]) ? editingRevision[0] : null);
-                    log.accept("Ambiente ativo: " + destination.label() + ". Nome salvo; aguardando cadastro no servidor.");
-                    dialog.dismiss();
-                } catch (IllegalArgumentException e) { feedback.setText(e.getMessage()); }
-            });
+        updates.setOnClickListener(v -> checkUpdates(updates, updateFeedback));
+        form.findViewById(R.id.testSettings).setOnClickListener(v -> {
+            try { test(selected(choice, address, port), feedback); }
+            catch (IllegalArgumentException e) { feedback.setText(e.getMessage()); }
         });
-        dialog.show();
+        form.findViewById(R.id.saveSettings).setOnClickListener(v -> {
+            try {
+                EnvironmentConfig destination = selected(choice, address, port);
+                String validName = ServerApi.validateName(name.getText().toString());
+                settings.select(destination);
+                // Use the revision shown when editing began, never a newer background refresh.
+                register(destination, validName, destination.baseUrl().equals(editingBase[0]) ? editingRevision[0] : null);
+                log.accept("Ambiente ativo: " + destination.label() + ". Nome salvo; aguardando cadastro no servidor.");
+                persistDraft = null;
+                saved.run();
+            } catch (IllegalArgumentException e) { feedback.setText(e.getMessage()); }
+        });
     }
 }

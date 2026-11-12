@@ -36,6 +36,8 @@
             android:grantUriPermissions="true">
             <meta-data android:name="android.support.FILE_PROVIDER_PATHS" android:resource="@xml/update_paths" />
         </provider>
+        <activity android:name=".SettingsActivity" android:exported="false"
+            android:parentActivityName=".MainActivity" android:windowSoftInputMode="adjustResize" />
         <activity android:name=".UpdateInstallActivity" android:exported="false" />
 
         <activity
