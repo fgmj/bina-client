@@ -58,7 +58,7 @@ public final class UpdateWorker extends Worker {
         NotificationManager manager = context.getSystemService(NotificationManager.class);
         if (Build.VERSION.SDK_INT >= 26) manager.createNotificationChannel(new NotificationChannel(CHANNEL, "Atualizações do aplicativo", NotificationManager.IMPORTANCE_LOW));
         NotificationCompat.Builder notification = new NotificationCompat.Builder(context, CHANNEL)
-                .setSmallIcon(R.drawable.baseline_wifi_calling_3_24).setContentTitle("Bina " + name)
+                .setSmallIcon(R.drawable.ic_stat_bina).setContentTitle("Bina " + name)
                 .setContentText(error == null ? "Atualização pronta para instalar" : error)
                 .setContentIntent(action).setAutoCancel(true).setOnlyAlertOnce(true).setSilent(true)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
